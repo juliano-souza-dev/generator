@@ -3758,6 +3758,7 @@ def _materials_final_job(
                 dual_scene_en_video=PROCESS_VIDEO_FILE,
                 dual_scene_pt_video=DUAL_SCENE_PT_FILE,
                 music_source_video=PROCESS_VIDEO_FILE,
+                shadowing_source_video=PROCESS_VIDEO_FILE,
                 progress=render_progress,
                 retry_only=render_retry,
             )

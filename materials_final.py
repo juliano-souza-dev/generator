@@ -135,6 +135,94 @@ def render_music_video(canonical: dict[str, Any], source_video: Path, output: Pa
         if completed.returncode: raise RuntimeError(f"Falha ao gerar o vídeo Music: {completed.stderr.strip()}")
 
 
+def _write_shadowing_ass(canonical: dict[str, Any], block: dict[str, Any], path: Path) -> None:
+    """Build the bilingual listening captions and EN repeat card used by the preview."""
+    start = int(block.get("start_ms") or 0)
+    end = int(block.get("end_ms") or block.get("pause_at_ms") or 0)
+    speech_duration = max(1, end - start)
+    pause_duration = max(1, int(block.get("pause_duration_ms") or 0))
+    header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+[V4+ Styles]
+Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
+Style: EN,Arial,54,&H00FFFFFF,&H00FFFFFF,&H00101010,&H99000000,-1,0,0,0,100,100,0,0,3,2,0,2,90,90,390,1
+Style: PT,Arial,42,&H00E4C98C,&H00E4C98C,&H00101010,&H99000000,-1,0,0,0,100,100,0,0,3,2,0,2,90,90,315,1
+Style: Repeat,Arial,64,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,5,110,110,0,1
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    cue_orders = {int(value) for value in (block.get("cue_orders") or [])}
+    events: list[str] = []
+    repeat_text: list[str] = []
+    for cue in (canonical.get("cues") or []):
+        if not isinstance(cue, dict):
+            continue
+        order = int(cue.get("order") or 0)
+        cue_start = max(start, int(cue.get("speech_start_ms") or cue.get("subtitle_start_ms") or 0))
+        cue_end = min(end, int(cue.get("speech_end_ms") or cue.get("subtitle_end_ms") or 0))
+        if cue_end <= cue_start or (cue_orders and order not in cue_orders):
+            continue
+        en = _ass_text(cue.get("approved_en") or cue.get("original_en") or cue.get("en") or cue.get("text_en") or "")
+        pt = _ass_text(cue.get("approved_pt") or cue.get("pt") or cue.get("text_pt") or cue.get("translation") or "")
+        if en:
+            events.append(f"Dialogue: 0,{_ass_time(cue_start-start)},{_ass_time(cue_end-start)},EN,,0,0,0,,{en}")
+            repeat_text.append(en)
+        if pt:
+            events.append(f"Dialogue: 0,{_ass_time(cue_start-start)},{_ass_time(cue_end-start)},PT,,0,0,0,,{pt}")
+    if repeat_text:
+        events.append(f"Dialogue: 1,{_ass_time(speech_duration)},{_ass_time(speech_duration+pause_duration)},Repeat,,0,0,0,," + r"{\an5}" + r"\N".join(repeat_text))
+    path.write_text(header + "\n".join(events) + "\n", encoding="utf-8-sig")
+
+
+def render_shadowing_video(canonical: dict[str, Any], shadowing_plan: dict[str, Any], source_video: Path, output: Path) -> None:
+    """Render included Shadowing blocks, their repeat pauses, and nothing outside them."""
+    blocks = [block for block in (shadowing_plan.get("blocks") or []) if isinstance(block, dict)]
+    if not blocks:
+        raise RuntimeError("Shadowing não contém blocos finalizados.")
+    if not source_video.is_file():
+        raise RuntimeError("Vídeo fonte do Shadowing não foi encontrado.")
+    if shutil.which("ffmpeg") is None:
+        raise RuntimeError("FFmpeg não encontrado.")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="generator_shadowing_") as temp_name:
+        temp = Path(temp_name)
+        parts: list[Path] = []
+        for index, block in enumerate(blocks, start=1):
+            start = int(block.get("start_ms") or 0)
+            end = int(block.get("end_ms") or block.get("pause_at_ms") or 0)
+            speech_duration = end - start
+            pause_duration = max(1, int(block.get("pause_duration_ms") or 0))
+            if speech_duration <= 0:
+                raise RuntimeError(f"Bloco {index} do Shadowing possui duração inválida.")
+            speech_seconds = speech_duration / 1000
+            pause_seconds = pause_duration / 1000
+            total_seconds = speech_seconds + pause_seconds
+            ass = temp / f"{index:03d}.ass"
+            part = temp / f"{index:03d}.mp4"
+            _write_shadowing_ass(canonical, block, ass)
+            escaped = str(ass).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
+            video_filter = (
+                "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,"
+                f"tpad=stop_mode=clone:stop_duration={pause_seconds:.3f},"
+                f"drawbox=color=black@0.90:t=fill:enable='gte(t,{speech_seconds:.3f})',"
+                f"subtitles='{escaped}'"
+            )
+            command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{start/1000:.3f}", "-t", f"{speech_seconds:.3f}", "-i", str(source_video), "-vf", video_filter, "-af", f"aresample=48000,apad=pad_dur={pause_seconds:.3f}", "-map", "0:v:0", "-map", "0:a:0", "-t", f"{total_seconds:.3f}", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", str(part)]
+            completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            if completed.returncode:
+                raise RuntimeError(f"Falha ao renderizar bloco {index} do Shadowing: {completed.stderr.strip()}")
+            parts.append(part)
+        concat_file = temp / "parts.txt"
+        concat_file.write_text("".join(f"file '{part.as_posix()}'\n" for part in parts), encoding="utf-8")
+        completed = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file), "-c", "copy", "-movflags", "+faststart", str(output)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if completed.returncode:
+            raise RuntimeError(f"Falha ao unir os blocos do Shadowing: {completed.stderr.strip()}")
+
+
 def _esc(value: Any) -> str:
     return html.escape(str(value or "")).replace("\n", "<br/>")
 
@@ -755,6 +843,7 @@ def generate_final_materials(
     dual_scene_en_video: Path | None = None,
     dual_scene_pt_video: Path | None = None,
     music_source_video: Path | None = None,
+    shadowing_source_video: Path | None = None,
     progress: Progress | None = None,
     retry_only: set[str] | None = None,
 ) -> dict[str, Any]:
@@ -859,6 +948,17 @@ def generate_final_materials(
             hub_json.unlink(missing_ok=True)
             fail("hub_json", "hub_final.json", exc)
     remember_artifact("hub_json", "hub", hub_json)
+
+    shadowing_video = output_dir / "videoShadowing.mp4"
+    if shadowing_plan.get("blocks"):
+        if wants("shadowing.video"):
+            try:
+                emit(88, "Gerando videoShadowing com trechos e pausas aprovados…")
+                render_shadowing_video(canonical, shadowing_plan, Path(shadowing_source_video or ""), shadowing_video)
+            except Exception as exc:
+                shadowing_video.unlink(missing_ok=True)
+                fail("shadowing.video", "videoShadowing.mp4", exc)
+        remember_artifact("mp4", "shadowing_video", shadowing_video)
 
     dual_video = output_dir / "videoDualScene.mp4"
     if canonical.get("dualScene"):

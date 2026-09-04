@@ -46,6 +46,7 @@
     ['anki', 'Anki', 'Deck sem áudio e deck com TTS aprovado.'],
     ['dual_scene', 'Vídeo Dual Scene', 'Blocos EN com destaque Word-by-Word alternados com os blocos PT sem legenda.'],
     ['music_video', 'Vídeo Music', 'Trecho vertical para TikTok com legendas Word-by-Word em inglês.'],
+    ['shadowing_video', 'Vídeo Shadowing', 'Somente os trechos aprovados, com pausas de repetição e encerramento no último OUT.'],
     ['tts', 'Áudios TTS', 'Pacote WAV e manifest técnico gerados pela Groq.'],
     ['package', 'Pacote completo', 'ZIP com os materiais finais e o JSON do HUB.'],
     ['other', 'Outros arquivos', 'Artefatos auxiliares da geração final.'],
