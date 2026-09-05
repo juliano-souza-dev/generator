@@ -300,11 +300,11 @@
   async function restoreWave() {
     const state = await api('/api/state');
     renderNavState(state);
-    if (topState) topState.textContent = state.configuration?.content_type === 'music' ? 'music · microimersão 30–60s' : (state.configuration?.dual_scene ? 'kit · DualScene' : 'kit · cena');
+    if (topState) topState.textContent = state.configuration?.content_type === 'music' ? 'music · trecho de 30s ou mais' : (state.configuration?.dual_scene ? 'kit · DualScene' : 'kit · cena');
     document.body.classList.toggle('music-flow', state.configuration?.content_type === 'music');
     if (state.configuration?.content_type === 'music') {
       if ($('waveHeroTitle')) $('waveHeroTitle').textContent = 'Defina o trecho da música';
-      if ($('waveHeroCopy')) $('waveHeroCopy').textContent = 'Selecione entre 30 e 60 segundos. Somente este microtrecho seguirá para lyrics, WbW e HUB.';
+      if ($('waveHeroCopy')) $('waveHeroCopy').textContent = 'Selecione pelo menos 30 segundos, sem limite máximo além da duração do vídeo. Somente este microtrecho seguirá para lyrics, WbW e HUB.';
       if ($('wavePanelCopy')) $('wavePanelCopy').textContent = 'Ajuste IN e OUT do microtrecho musical. Mínimo 30s · máximo 60s.';
     }
     startWavePolling();

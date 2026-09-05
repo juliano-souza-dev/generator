@@ -988,7 +988,7 @@ def _build_external_instructions(document: dict[str, Any]) -> str:
     task_title = "MUSIC LYRICS + TRANSLATION + WORD BY WORD" if is_music else "EXTERNAL AI AUDIO ANALYSIS"
     mode_rules = (
         "MUSIC MODE\n"
-        "- This is a 30–60 second micro-immersion excerpt, not the full song.\n"
+        "- Use exactly the selected music interval; there is no maximum duration.\n"
         "- Identify the exact song/version from the YouTube metadata plus audio when possible.\n"
         "- Each cue is a sung lyric line or natural lyric fragment. Do not include generic [Music] cues.\n"
         "- Transcribe only what is actually sung inside this cut. Never complete lyrics outside the selected interval.\n"
@@ -4525,8 +4525,6 @@ def save_cut(request: CutRequest):
         selected_duration = end - start
         if selected_duration < 30000:
             raise HTTPException(status_code=422, detail="Music exige um recorte mínimo de 30 segundos.")
-        if selected_duration > 60000:
-            raise HTTPException(status_code=422, detail="Music aceita no máximo 60 segundos por microimersão.")
 
     previous_cut = state.get("cut") or {}
     same_cut = bool(previous_cut.get("saved")) and int(previous_cut.get("start_ms") or 0) == start and int(previous_cut.get("end_ms") or 0) == end

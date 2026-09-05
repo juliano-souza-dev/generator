@@ -32,7 +32,7 @@
       <fieldset class="type-picker">
         <legend>TIPO DE CONTEÚDO</legend>
         <label class="type-option"><input type="radio" name="contentType" value="kit" checked><span><b>Kit / cena</b><small>Cena, diálogo, filme, série, entrevista ou outro conteúdo falado.</small></span></label>
-        <label class="type-option"><input type="radio" name="contentType" value="music"><span><b>♫ Música</b><small>Microimersão musical de 30–60s com Lyrics + Word by Word.</small></span></label>
+        <label class="type-option"><input type="radio" name="contentType" value="music"><span><b>♫ Música</b><small>Microimersão musical de 30s ou mais com Lyrics + Word by Word.</small></span></label>
       </fieldset>
       <fieldset class="type-picker transcription-picker">
         <legend>ORIGEM DA TRANSCRIÇÃO</legend>
@@ -40,7 +40,7 @@
         <label class="type-option"><input type="radio" name="transcriptionMode" value="external" checked><span><b>Transcrever somente na IA externa</b><small>O Generator envia o áudio sem cues. A IA externa faz transcrição, timing, tradução e materiais em uma única análise.</small></span></label>
       </fieldset>
       <label id="dualToggleWrap" class="dual-toggle"><input id="dualScene" type="checkbox"><span class="switch" aria-hidden="true"></span><span><b>DualScene</b><small>Usar também um vídeo equivalente em português.</small></span></label>
-      <div id="musicPending" class="notice" hidden><b>Music Micro-Immersion</b><span>Você escolherá manualmente um trecho entre 30 e 60 segundos. Dual Scene, Shadowing e Connected Speech não fazem parte deste ramo.</span></div>
+      <div id="musicPending" class="notice" hidden><b>Music Micro-Immersion</b><span>Você escolherá manualmente um trecho de pelo menos 30 segundos, sem limite máximo além da duração do vídeo. Dual Scene, Shadowing e Connected Speech não fazem parte deste ramo.</span></div>
       <div id="configStatus" class="inline-status page-status"></div>
       <div class="stage-actions"><a class="btn btn-outline btn-link" href="/">← Voltar para fonte</a><button id="continueConfig" class="btn btn-primary btn-lg" type="button">Prosseguir →</button></div>
     </section>
