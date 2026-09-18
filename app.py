@@ -33,9 +33,11 @@ from materials_final import generate_final_materials
 from tts_service import synthesize_tts
 
 BASE_DIR = Path(__file__).resolve().parent
-STATIC_DIR = BASE_DIR / "static"
-WORKSPACE_DIR = BASE_DIR / "workspace"
-PROJECTS_DIR = BASE_DIR / "projects"
+RESOURCE_DIR = Path(os.environ.get("GENERATOR_RESOURCE_DIR") or BASE_DIR).expanduser().resolve()
+DATA_DIR = Path(os.environ.get("GENERATOR_DATA_DIR") or BASE_DIR).expanduser().resolve()
+STATIC_DIR = RESOURCE_DIR / "static"
+WORKSPACE_DIR = DATA_DIR / "workspace"
+PROJECTS_DIR = DATA_DIR / "projects"
 PROJECTS_INDEX_FILE = PROJECTS_DIR / "index.json"
 SOURCE_EN_DIR = WORKSPACE_DIR / "source" / "en"
 STATE_FILE = WORKSPACE_DIR / "state.json"
@@ -48,7 +50,7 @@ PROCESS_VIDEO_FILE = PROCESS_OUTPUT_DIR / "scene_video.mp4"
 PROCESS_AUDIO_FILE = PROCESS_OUTPUT_DIR / "scene_audio_16k_mono.wav"
 PROCESS_JSON_FILE = PROCESS_OUTPUT_DIR / "initial_scene.json"
 
-TEMPLATE_DIR = BASE_DIR / "templates"
+TEMPLATE_DIR = RESOURCE_DIR / "templates"
 CANONICAL_TEMPLATE_FILE = TEMPLATE_DIR / "canonical_v1_7.json"
 EXTERNAL_AI_DIR = WORKSPACE_DIR / "external_ai"
 EXTERNAL_AI_CANONICAL_FILE = EXTERNAL_AI_DIR / "canonical_scene.json"
