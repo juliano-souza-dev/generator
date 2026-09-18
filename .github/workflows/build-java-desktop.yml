@@ -62,6 +62,27 @@ jobs:
           New-Item -ItemType Directory -Force -Path "target/app/tools/ffmpeg" | Out-Null
           Copy-Item -Path (Join-Path $ffmpegRoot.FullName "bin\*") -Destination "target/app/tools/ffmpeg" -Recurse -Force
 
+          $whisperUrl = "https://github.com/ggml-org/whisper.cpp/releases/download/b5130/whisper-bin-x64.zip"
+          $whisperZip = "target/whisper.zip"
+          Invoke-WebRequest -Uri $whisperUrl -OutFile $whisperZip
+          $whisperExpected = "f9ec6c52a2e949b62ab51fa21d0d497958f9e41c3010c157c4e42932d5316f3c"
+          $whisperActual = (Get-FileHash -Path $whisperZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($whisperActual -ne $whisperExpected) { throw "Bundled transcription tool checksum mismatch" }
+
+          $whisperExtract = "target/whisper-extract"
+          Expand-Archive -Path $whisperZip -DestinationPath $whisperExtract -Force
+          $whisperCli = Get-ChildItem -Path $whisperExtract -Recurse -Filter "whisper-cli.exe" | Select-Object -First 1
+          if (-not $whisperCli) { throw "whisper-cli.exe not found in release archive" }
+          New-Item -ItemType Directory -Force -Path "target/app/tools/whisper" | Out-Null
+          Copy-Item -Path (Join-Path $whisperCli.Directory.FullName "*") -Destination "target/app/tools/whisper" -Recurse -Force
+
+          New-Item -ItemType Directory -Force -Path "target/app/tools/whisper/models" | Out-Null
+          $whisperModel = "target/app/tools/whisper/models/ggml-base.en.bin"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin?download=true" -OutFile $whisperModel
+          $modelExpected = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
+          $modelActual = (Get-FileHash -Path $whisperModel -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($modelActual -ne $modelExpected) { throw "Bundled transcription model checksum mismatch" }
+
       - name: Build self-contained app image
         shell: pwsh
         run: jpackage --type app-image --name "ImmersionHub Generator" --dest target/app-image --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub"
@@ -76,6 +97,16 @@ jobs:
           $ytdlp = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/yt-dlp.exe"
           $ytdlpProcess = Start-Process -FilePath $ytdlp -ArgumentList "--version" -PassThru -Wait
           if ($ytdlpProcess.ExitCode -ne 0) { throw "Bundled source tool smoke test failed" }
+
+          $whisper = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/whisper/whisper-cli.exe"
+          $whisperProcess = Start-Process -FilePath $whisper -ArgumentList "--version" -PassThru -Wait
+          if ($whisperProcess.ExitCode -ne 0) { throw "Bundled transcription tool smoke test failed" }
+
+          $whisperModel = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/whisper/models/ggml-base.en.bin"
+          $modelActual = (Get-FileHash -Path $whisperModel -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($modelActual -ne "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002") {
+            throw "Packaged transcription model checksum mismatch"
+          }
 
           $ffmpeg = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/ffmpeg/ffmpeg.exe"
           & $ffmpeg -hide_banner -loglevel error -version
