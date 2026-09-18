@@ -25,22 +25,21 @@
   </nav>
 
   <main class="page-shell">
-    <header class="page-hero"><div><span class="eyebrow">ETAPA 02 · CONFIGURAÇÃO</span><h1>Configuração</h1><p>Escolha o tipo de conteúdo. Para Kit/cena, você pode habilitar DualScene antes de preparar o Wave Editor.</p></div><div class="hero-badge">SOURCE READY</div></header>
+    <header class="page-hero"><div><span class="eyebrow">ETAPA 02 · CONFIGURAÇÃO</span><h1>Configuração</h1><p>Escolha o tipo de conteúdo e como a transcrição será preparada antes do Wave Editor.</p></div><div class="hero-badge">SOURCE READY</div></header>
     <section class="panel stage-panel">
-      <div class="panel-head"><div class="stage-title"><span class="stage-number">02</span><div><h2>Tipo de conteúdo</h2><p>O fluxo de música será definido posteriormente.</p></div></div><span class="stage-chip">CONFIGURAÇÃO</span></div>
+      <div class="panel-head"><div class="stage-title"><span class="stage-number">02</span><div><h2>Tipo de conteúdo</h2><p>Kit/cena e Música compartilham a mesma base de revisão e timing.</p></div></div><span class="stage-chip">CONFIGURAÇÃO</span></div>
       <div id="sourceSummary" class="source-summary"></div>
       <fieldset class="type-picker">
         <legend>TIPO DE CONTEÚDO</legend>
         <label class="type-option"><input type="radio" name="contentType" value="kit" checked><span><b>Kit / cena</b><small>Cena, diálogo, filme, série, entrevista ou outro conteúdo falado.</small></span></label>
-        <label class="type-option"><input type="radio" name="contentType" value="music"><span><b>♫ Música</b><small>Microimersão musical de 30s ou mais com Lyrics + Word by Word.</small></span></label>
+        <label class="type-option"><input type="radio" name="contentType" value="music"><span><b>♫ Música</b><small>Microimersão musical de 30–60s com Lyrics + Word by Word + Shadowing.</small></span></label>
       </fieldset>
       <fieldset class="type-picker transcription-picker">
         <legend>ORIGEM DA TRANSCRIÇÃO</legend>
         <label class="type-option"><input type="radio" name="transcriptionMode" value="generator"><span><b>Transcrever no Generator</b><small>O Generator cria cues e timestamps por palavra. A IA externa valida, corrige e traduz esse rascunho.</small></span></label>
         <label class="type-option"><input type="radio" name="transcriptionMode" value="external" checked><span><b>Transcrever somente na IA externa</b><small>O Generator envia o áudio sem cues. A IA externa faz transcrição, timing, tradução e materiais em uma única análise.</small></span></label>
       </fieldset>
-      <label id="dualToggleWrap" class="dual-toggle"><input id="dualScene" type="checkbox"><span class="switch" aria-hidden="true"></span><span><b>DualScene</b><small>Usar também um vídeo equivalente em português.</small></span></label>
-      <div id="musicPending" class="notice" hidden><b>Music Micro-Immersion</b><span>Você escolherá manualmente um trecho de pelo menos 30 segundos, sem limite máximo além da duração do vídeo. Dual Scene, Shadowing e Connected Speech não fazem parte deste ramo.</span></div>
+      <div id="musicPending" class="notice" hidden><b>Music Micro-Immersion</b><span>Você escolherá manualmente um trecho entre 30 e 60 segundos. O fluxo mantém Shadowing e pula somente Connected Speech.</span></div>
       <div id="configStatus" class="inline-status page-status"></div>
       <div class="stage-actions"><a class="btn btn-outline btn-link" href="/">← Voltar para fonte</a><button id="continueConfig" class="btn btn-primary btn-lg" type="button">Prosseguir →</button></div>
     </section>
@@ -56,16 +55,6 @@
     </section>
   </main>
 
-  <dialog id="ptModal" class="app-dialog">
-    <form class="dialog-panel" id="ptForm" novalidate>
-      <header class="dialog-head"><div><span class="mini-kicker">DUALSCENE</span><h2>Vídeo equivalente em Português</h2></div><button id="closePtModal" class="dialog-x" type="button">×</button></header>
-      <p>DualScene exige uma segunda fonte válida e incorporável. Não é possível prosseguir sem ela.</p>
-      <label class="field-block"><span class="field-label">URL DO YOUTUBE · FONTE PT</span><div class="url-row"><input id="ptUrl" class="text-field mono" type="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=..."><button id="validatePt" class="btn btn-outline" type="button">Validar URL</button></div></label>
-      <div id="ptStatus" class="inline-status">Informe uma fonte PT válida.</div>
-      <div id="ptValidated" class="validated-inline" hidden><span>✓</span><div><b id="ptTitle">Fonte PT validada</b><small>URL válida e incorporável.</small></div></div>
-      <footer class="dialog-actions"><button id="cancelPtModal" class="btn btn-outline" type="button">Cancelar</button><button id="acceptPt" class="btn btn-primary" type="button" disabled>Usar vídeo PT e continuar →</button></footer>
-    </form>
-  </dialog>
   <script src="/static/config_groq.js?v=alpha-1.39" defer></script>
   <script src="/static/app.js?v=alpha-1.83" defer></script>
 <script src="/static/mobile.js?v=alpha-1.74" defer></script></body>

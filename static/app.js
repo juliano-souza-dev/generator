@@ -3,10 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const topState = $('topState');
   let enValidationToken = 0;
-  let ptValidationToken = 0;
-  let ptIsValid = false;
   let enDebounce = 0;
-  let ptDebounce = 0;
   let wavePoll = 0;
   let processPoll = 0;
   let rangeEditor = null;
@@ -66,7 +63,7 @@
     }
     const sourceReady = Boolean(state.en?.validated && state.en?.embeddable && state.en?.url);
     const cfg = state.configuration || {};
-    const configReady = Boolean(cfg.configured && ['kit','music'].includes(cfg.content_type) && (cfg.content_type === 'music' || !cfg.dual_scene || (state.pt?.validated && state.pt?.embeddable && state.pt?.url)));
+    const configReady = Boolean(cfg.configured && ['kit','music'].includes(cfg.content_type));
     const processReady = Boolean(configReady && state.cut?.saved);
     const externalReady = Boolean(processReady && state.process?.status === 'ready');
     const cueReviewReady = Boolean(externalReady && state.external_ai?.validated);
@@ -83,63 +80,39 @@
     document.querySelectorAll('[data-gated="word-timing"]').forEach((a) => a.classList.toggle('is-disabled', !wordTimingReady));
   }
 
-  async function validateSource(role) {
-    const input = role === 'en' ? $('enUrl') : $('ptUrl');
-    const status = role === 'en' ? $('enStatus') : $('ptStatus');
-    const button = role === 'en' ? $('validateEn') : $('validatePt');
+  async function validateSource() {
+    const input = $('enUrl');
+    const status = $('enStatus');
+    const button = $('validateEn');
     const value = String(input?.value || '').trim();
     if (!value) {
-      setStatus(status, role === 'en' ? 'Cole uma URL do YouTube.' : 'Informe o vídeo equivalente em Português.');
-      if (role === 'pt') {
-        ptIsValid = false;
-        if ($('acceptPt')) $('acceptPt').disabled = true;
-        if ($('ptValidated')) $('ptValidated').hidden = true;
-      }
+      setStatus(status, 'Cole uma URL do YouTube.');
       return false;
     }
 
-    const token = role === 'en' ? ++enValidationToken : ++ptValidationToken;
+    const token = ++enValidationToken;
     setStatus(status, 'Validando URL e permissão de incorporação…', 'loading');
     if (button) button.disabled = true;
     try {
-      const data = await api('/api/youtube/validate', {method:'POST', body:JSON.stringify({video_url:value, role})});
-      if ((role === 'en' ? enValidationToken : ptValidationToken) !== token) return false;
+      const data = await api('/api/youtube/validate', {method:'POST', body:JSON.stringify({video_url:value, role:'en'})});
+      if (enValidationToken !== token) return false;
       const source = data.source || {};
       if (!data.can_proceed) {
         setStatus(status, `URL reconhecida, mas não pode prosseguir: ${source.reason || 'Este vídeo não permite reprodução incorporada.'}`, 'error');
-        if (role === 'en' && $('enValidated')) $('enValidated').hidden = true;
-        if (role === 'pt') {
-          ptIsValid = false;
-          $('acceptPt').disabled = true;
-          $('ptValidated').hidden = true;
-        }
+        if ($('enValidated')) $('enValidated').hidden = true;
         return false;
       }
-
-      if (role === 'en') {
-        $('enTitle').textContent = source.title || 'Vídeo EN validado';
-        $('enValidatedUrl').textContent = source.url || value;
-        $('enValidated').hidden = false;
-        setStatus(status, '✓ URL válida e vídeo incorporável. Podemos prosseguir.', 'success');
-        if (topState) topState.textContent = 'fonte EN validada';
-      } else {
-        ptIsValid = true;
-        $('ptTitle').textContent = source.title || 'Fonte PT validada';
-        $('ptValidated').hidden = false;
-        $('acceptPt').disabled = false;
-        setStatus(status, '✓ URL PT válida e vídeo incorporável.', 'success');
-      }
+      $('enTitle').textContent = source.title || 'Vídeo EN validado';
+      $('enValidatedUrl').textContent = source.url || value;
+      $('enValidated').hidden = false;
+      setStatus(status, '✓ URL válida e vídeo incorporável. Podemos prosseguir.', 'success');
+      if (topState) topState.textContent = 'fonte EN validada';
       const state = await api('/api/state');
       renderNavState(state);
       return true;
     } catch (error) {
       setStatus(status, error.message || 'Falha na validação.', 'error');
-      if (role === 'en' && $('enValidated')) $('enValidated').hidden = true;
-      if (role === 'pt') {
-        ptIsValid = false;
-        $('acceptPt').disabled = true;
-        $('ptValidated').hidden = true;
-      }
+      if ($('enValidated')) $('enValidated').hidden = true;
       return false;
     } finally {
       if (button) button.disabled = false;
@@ -149,17 +122,16 @@
   function updateContentTypeUI() {
     if (page !== 'config') return;
     const music = typeValue() === 'music';
-    $('dualToggleWrap').hidden = music;
     $('musicPending').hidden = !music;
     $('continueConfig').disabled = false;
     $('continueConfig').textContent = music ? 'Prosseguir para recorte musical →' : 'Prosseguir →';
   }
 
-  async function configureKit(dual) {
+  async function configureKit() {
     $('continueConfig').disabled = true;
     setStatus($('configStatus'), 'Preparando a próxima página…', 'loading');
     try {
-      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:'kit', dual_scene:Boolean(dual), transcription_mode:transcriptionValue()})});
+      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:'kit', dual_scene:false, transcription_mode:transcriptionValue()})});
       window.location.assign(configured.next_url || '/wave');
     } catch (error) {
       setStatus($('configStatus'), error.message, 'error');
@@ -168,37 +140,15 @@
   }
 
   async function continueConfiguration() {
-    if (typeValue() === 'music') {
-      $('continueConfig').disabled = true;
-      setStatus($('configStatus'), 'Preparando o Wave Editor da música…', 'loading');
-      try {
-        const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:'music', dual_scene:false, transcription_mode:transcriptionValue()})});
-        window.location.assign(configured.next_url || '/wave');
-      } catch (error) {
-        setStatus($('configStatus'), error.message, 'error');
-        $('continueConfig').disabled = false;
-      }
-      return;
-    }
-    const dual = $('dualScene').checked;
-    if (dual && !ptIsValid) {
-      $('ptModal').showModal();
-      setTimeout(() => $('ptUrl').focus(), 50);
-      return;
-    }
-    await configureKit(dual);
-  }
-
-  async function acceptPtAndContinue() {
-    if (!ptIsValid) return;
-    $('acceptPt').disabled = true;
+    const contentType = typeValue();
+    $('continueConfig').disabled = true;
+    setStatus($('configStatus'), contentType === 'music' ? 'Preparando o Wave Editor da música…' : 'Preparando a próxima página…', 'loading');
     try {
-      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:'kit', dual_scene:true, transcription_mode:transcriptionValue()})});
-      $('ptModal').close();
+      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:contentType, dual_scene:false, transcription_mode:transcriptionValue()})});
       window.location.assign(configured.next_url || '/wave');
     } catch (error) {
-      setStatus($('ptStatus'), error.message, 'error');
-      $('acceptPt').disabled = !ptIsValid;
+      setStatus($('configStatus'), error.message, 'error');
+      $('continueConfig').disabled = false;
     }
   }
 
@@ -281,15 +231,6 @@
     const cfg = state.configuration || {};
     if (cfg.content_type) document.querySelector(`input[name="contentType"][value="${cfg.content_type}"]`)?.click();
     document.querySelector(`input[name="transcriptionMode"][value="${cfg.transcription_mode || 'external'}"]`)?.click();
-    $('dualScene').checked = Boolean(cfg.dual_scene);
-    if (state.pt?.url) $('ptUrl').value = state.pt.url;
-    ptIsValid = Boolean(state.pt?.validated && state.pt?.embeddable);
-    if (ptIsValid) {
-      $('ptValidated').hidden = false;
-      $('ptTitle').textContent = state.pt.title || 'Fonte PT validada';
-      $('acceptPt').disabled = false;
-      setStatus($('ptStatus'), '✓ URL PT válida e vídeo incorporável.', 'success');
-    }
     updateContentTypeUI();
   }
 
@@ -300,11 +241,11 @@
   async function restoreWave() {
     const state = await api('/api/state');
     renderNavState(state);
-    if (topState) topState.textContent = state.configuration?.content_type === 'music' ? 'music · trecho de 30s ou mais' : (state.configuration?.dual_scene ? 'kit · DualScene' : 'kit · cena');
+    if (topState) topState.textContent = state.configuration?.content_type === 'music' ? 'music · trecho de 30–60s' : 'kit · cena';
     document.body.classList.toggle('music-flow', state.configuration?.content_type === 'music');
     if (state.configuration?.content_type === 'music') {
       if ($('waveHeroTitle')) $('waveHeroTitle').textContent = 'Defina o trecho da música';
-      if ($('waveHeroCopy')) $('waveHeroCopy').textContent = 'Selecione pelo menos 30 segundos, sem limite máximo além da duração do vídeo. Somente este microtrecho seguirá para lyrics, WbW e HUB.';
+      if ($('waveHeroCopy')) $('waveHeroCopy').textContent = 'Selecione um microtrecho entre 30 e 60 segundos. Somente esse intervalo seguirá para lyrics, WbW, Shadowing e HUB.';
       if ($('wavePanelCopy')) $('wavePanelCopy').textContent = 'Ajuste IN e OUT do microtrecho musical. Mínimo 30s · máximo 60s.';
     }
     startWavePolling();
@@ -1087,11 +1028,11 @@
   }
 
   if (page === 'source') {
-    $('validateEn').addEventListener('click', () => validateSource('en'));
+    $('validateEn').addEventListener('click', validateSource);
     $('enUrl').addEventListener('input', () => {
       clearTimeout(enDebounce);
       $('enValidated').hidden = true;
-      enDebounce = setTimeout(() => validateSource('en'), 850);
+      enDebounce = setTimeout(validateSource, 850);
     });
     restoreSource().catch(() => {});
   }
@@ -1099,18 +1040,6 @@
   if (page === 'config') {
     document.querySelectorAll('input[name="contentType"]').forEach((input) => input.addEventListener('change', updateContentTypeUI));
     $('continueConfig').addEventListener('click', continueConfiguration);
-    $('validatePt').addEventListener('click', () => validateSource('pt'));
-    $('ptForm').addEventListener('submit', (event) => { event.preventDefault(); validateSource('pt'); });
-    $('closePtModal').addEventListener('click', () => $('ptModal').close());
-    $('cancelPtModal').addEventListener('click', () => $('ptModal').close());
-    $('ptUrl').addEventListener('input', () => {
-      clearTimeout(ptDebounce);
-      ptIsValid = false;
-      $('acceptPt').disabled = true;
-      $('ptValidated').hidden = true;
-      ptDebounce = setTimeout(() => validateSource('pt'), 850);
-    });
-    $('acceptPt').addEventListener('click', acceptPtAndContinue);
     restoreConfig().catch((error) => setStatus($('configStatus'), error.message, 'error'));
   }
 

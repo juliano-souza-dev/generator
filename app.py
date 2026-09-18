@@ -3156,53 +3156,6 @@ def _connected_speech_review_payload(sequence_order: int | None = None) -> dict[
     }
 
 
-def _seed_connected_speech_from_one_pass() -> bool:
-    if not EXTERNAL_AI_ONE_PASS_FILE.is_file() or not WORD_TIMING_CANONICAL_FILE.is_file() or not SHADOWING_PLAN_FILE.is_file():
-        return False
-    document, work_end, canonical_sha, cue_map, expected_orders = _connected_speech_validation_context()
-    saved = json.loads(EXTERNAL_AI_ONE_PASS_FILE.read_text(encoding="utf-8"))
-    candidates = {int(row.get("cue_order") or 0): row for row in ((saved.get("connected_speech") or {}).get("cues") or []) if isinstance(row, dict)}
-    sequence = 0
-    cues: list[dict[str, Any]] = []
-    for order in expected_orders:
-        cue = cue_map[order]
-        cue_start, cue_end = _connected_speech_cue_bounds(cue)
-        phenomena: list[dict[str, Any]] = []
-        for item in (candidates.get(order) or {}).get("phenomena") or []:
-            start_ms, end_ms = int(item.get("start_ms") or 0), int(item.get("end_ms") or 0)
-            source_text = str(item.get("source_text") or "").strip()
-            current_text = str(cue.get("approved_en") or cue.get("original_en") or "")
-            if not source_text or source_text.casefold() not in current_text.casefold():
-                continue
-            if not cue_start <= start_ms < end_ms <= min(cue_end, work_end):
-                continue
-            sequence += 1
-            phenomena.append({**item, "sequenceOrder": sequence})
-        cues.append({"cue_order": order, "phenomena": phenomena})
-    returned = {
-        "schema": "immersionhub-connected-speech-analysis", "schema_version": "1.0",
-        "source_snapshot_id": str(document.get("snapshot_id") or ""),
-        "source_canonical_sha256": canonical_sha,
-        "audio_scope": {"start_ms": 0, "end_ms": work_end}, "cues": cues,
-    }
-    summary = _validate_connected_speech_return(returned)
-    CONNECTED_SPEECH_DIR.mkdir(parents=True, exist_ok=True)
-    CONNECTED_SPEECH_RETURN_FILE.write_text(json.dumps(returned, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    _write_connected_speech_review_result(returned, {})
-    total = int(summary.get("phenomena") or 0)
-    def save(state: dict[str, Any]) -> None:
-        state["connected_speech"].update({
-            "status": "validated", "validated": True, "error": "", "returned_filename": "one_pass_final_materials.json",
-            "validation_summary": summary, "validated_at": _now_iso(), "review_total": total,
-            "review_decisions": {}, "current_sequence_order": 1 if total else 0,
-            "review_completed": total == 0, "review_updated_at": "",
-        })
-    _update_state(save)
-    if total == 0:
-        _activate_one_pass_anki()
-    return True
-
-
 def _activate_one_pass_anki() -> bool:
     if not EXTERNAL_AI_ONE_PASS_FILE.is_file() or not WORD_TIMING_CANONICAL_FILE.is_file():
         return False
@@ -4431,13 +4384,9 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
     if not (en.get("validated") and en.get("embeddable") and en.get("url")):
         raise HTTPException(status_code=409, detail="Valide primeiro um vídeo EN que permita incorporação.")
 
-    if request.content_type == "music":
-        request.dual_scene = False
-
-    if request.content_type == "kit" and request.dual_scene:
-        pt = state["pt"]
-        if not (pt.get("validated") and pt.get("embeddable") and pt.get("url")):
-            raise HTTPException(status_code=409, detail="DualScene exige um vídeo PT válido e incorporável antes de continuar.")
+    # Dual Scene is retired. The field remains in ConfigureRequest only for
+    # backward-compatible payload parsing; active configuration always disables it.
+    request.dual_scene = False
 
     previous_configuration = state.get("configuration") or {}
     preserve_reviews = (
@@ -4447,11 +4396,10 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
         and bool((state.get("word_timing") or {}).get("completed"))
         and WORD_TIMING_CANONICAL_FILE.is_file()
     )
-    switching_to_dual = preserve_reviews and not bool(previous_configuration.get("dual_scene")) and bool(request.dual_scene)
     configuration_unchanged = (
         bool(previous_configuration.get("configured"))
         and str(previous_configuration.get("content_type") or "") == request.content_type
-        and bool(previous_configuration.get("dual_scene")) == (bool(request.dual_scene) if request.content_type == "kit" else False)
+        and not bool(previous_configuration.get("dual_scene"))
         and str(previous_configuration.get("transcription_mode") or "external") == request.transcription_mode
     )
 
@@ -4460,21 +4408,18 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
         unchanged = (
             bool(previous.get("configured"))
             and str(previous.get("content_type") or "") == request.content_type
-            and bool(previous.get("dual_scene")) == (bool(request.dual_scene) if request.content_type == "kit" else False)
+            and not bool(previous.get("dual_scene"))
             and str(previous.get("transcription_mode") or "external") == request.transcription_mode
         )
         s["configuration"] = {
             "content_type": request.content_type,
-            "dual_scene": bool(request.dual_scene) if request.content_type == "kit" else False,
+            "dual_scene": False,
             "transcription_mode": request.transcription_mode,
             "configured": True,
         }
         if unchanged:
             return
         if preserve_reviews:
-            if switching_to_dual:
-                s["process"] = _default_state()["process"]
-                s["media_refresh_preserve_reviews"] = True
             return
         s.pop("resume_after_media", None)
         s["process"] = _default_state()["process"]
@@ -4485,7 +4430,7 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
         s["dual_scene"] = _default_state()["dual_scene"]
     state = _update_state(configured_state)
     if preserve_reviews:
-        return {"ok": True, "preserved": True, "next_url": "/process" if switching_to_dual else ("/dual-scene" if request.dual_scene else "/shadowing"), "wave_started": False}
+        return {"ok": True, "preserved": True, "next_url": "/shadowing", "wave_started": False}
     if not configuration_unchanged:
         shutil.rmtree(CUE_REVIEW_DIR, ignore_errors=True)
         shutil.rmtree(WORD_REVIEW_DIR, ignore_errors=True)
