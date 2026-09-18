@@ -30,7 +30,7 @@ def test_all_html_pages_load_mobile_helper():
     assert pages
     for page in pages:
         text = page.read_text(encoding="utf-8")
-        assert "/static/mobile.js?v=alpha-1.39" in text, page.name
+        assert "/static/mobile.js" in text, page.name
 
 
 def test_qr_dependency_is_declared():
@@ -42,7 +42,7 @@ def test_qr_dependency_is_declared():
 
 def test_show_mobile_access_creates_png(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(run_launcher, "ROOT", tmp_path)
-    url = "https://mobile-test.trycloudflare.com"
+    url = "http://192.168.1.50:8080"
     qr_path = run_launcher._show_mobile_access(url)
     out = capsys.readouterr().out
     assert url in out
@@ -50,3 +50,10 @@ def test_show_mobile_access_creates_png(tmp_path, monkeypatch, capsys):
     assert qr_path == tmp_path / "mobile_access_qr.png"
     assert qr_path.is_file()
     assert qr_path.stat().st_size > 0
+
+
+def test_public_tunnel_is_opt_in(monkeypatch):
+    monkeypatch.delenv("GENERATOR_PUBLIC_TUNNEL", raising=False)
+    assert run_launcher._public_tunnel_enabled() is False
+    monkeypatch.setenv("GENERATOR_PUBLIC_TUNNEL", "1")
+    assert run_launcher._public_tunnel_enabled() is True
