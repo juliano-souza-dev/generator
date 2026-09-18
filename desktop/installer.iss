@@ -18,12 +18,16 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-CloseApplications=force
+CloseApplications=yes
 CloseApplicationsFilter=*.*
 RestartApplications=no
 UninstallDisplayName={#MyAppName}
 UsePreviousAppDir=yes
 DisableProgramGroupPage=yes
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\runtime"
+Type: filesandordirs; Name: "{app}\app"
 
 [Files]
 Source: "target\app-image\ImmersionHub Generator\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -37,3 +41,20 @@ Name: "desktopicon"; Description: "Criar atalho na área de trabalho"; GroupDesc
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Abrir {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  { Ensure an existing desktop instance cannot keep the packaged Java runtime locked. }
+  Exec(
+    ExpandConstant('{cmd}'),
+    '/C taskkill /F /IM "ImmersionHub Generator.exe" >nul 2>&1',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  Result := '';
+end;
