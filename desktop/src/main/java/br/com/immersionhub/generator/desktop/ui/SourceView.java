@@ -21,7 +21,8 @@ public final class SourceView {
     public SourceView(
         SourceAcquisitionService sourceService,
         SourceMedia existingMedia,
-        Consumer<SourceMedia> continueAction
+        Consumer<SourceMedia> continueAction,
+        Runnable invalidateAction
     ) {
         readyMedia = existingMedia;
 
@@ -65,10 +66,21 @@ public final class SourceView {
             status.setText("Fonte pronta: " + existingMedia.title());
         }
 
+        url.textProperty().addListener((observable, previous, current) -> {
+            if (readyMedia == null) return;
+            if (current != null && current.trim().equals(readyMedia.canonicalUrl())) return;
+
+            readyMedia = null;
+            next.setDisable(true);
+            status.setText("A URL mudou. Prepare a nova fonte antes de continuar.");
+            invalidateAction.run();
+        });
+
         prepare.setOnAction(event -> {
             String rawUrl = url.getText();
             readyMedia = null;
             next.setDisable(true);
+            invalidateAction.run();
             prepare.setDisable(true);
             url.setDisable(true);
             progress.setVisible(true);
