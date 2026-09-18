@@ -106,7 +106,7 @@ public final class WhisperDtwWordAligner implements WordAligner {
                 if (end <= start) {
                     throw new IOException("Âncoras DTW não formam uma sequência temporal válida.");
                 }
-                words.add(new TimedText(current.text(), start, end));
+                words.add(new TimedText(current.text(), start, end, current.confidence()));
             }
         }
 
@@ -125,6 +125,8 @@ public final class WhisperDtwWordAligner implements WordAligner {
         List<AnchoredWord> words = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         long anchorMs = -1;
+        double confidenceSum = 0.0;
+        int confidenceCount = 0;
 
         for (JsonNode token : tokens) {
             String raw = token.path("text").asText("");
@@ -139,9 +141,15 @@ public final class WhisperDtwWordAligner implements WordAligner {
 
             if (startsWord && !current.isEmpty()) {
                 if (anchorMs < 0) throw new IOException("Palavra sem âncora DTW.");
-                words.add(new AnchoredWord(current.toString(), anchorMs));
+                words.add(new AnchoredWord(
+                    current.toString(),
+                    anchorMs,
+                    confidenceCount == 0 ? null : confidenceSum / confidenceCount
+                ));
                 current.setLength(0);
                 anchorMs = -1;
+                confidenceSum = 0.0;
+                confidenceCount = 0;
             }
 
             if (!current.isEmpty() && punctuationOnly) {
@@ -154,6 +162,10 @@ public final class WhisperDtwWordAligner implements WordAligner {
             }
 
             current.append(piece);
+            if (token.path("p").isNumber()) {
+                confidenceSum += token.path("p").asDouble();
+                confidenceCount++;
+            }
             long tokenDtw = token.path("t_dtw").asLong(-1);
             if (anchorMs < 0 && tokenDtw >= 0) {
                 anchorMs = tokenDtw * 10L;
@@ -162,7 +174,11 @@ public final class WhisperDtwWordAligner implements WordAligner {
 
         if (!current.isEmpty()) {
             if (anchorMs < 0) throw new IOException("Palavra sem âncora DTW.");
-            words.add(new AnchoredWord(current.toString(), anchorMs));
+            words.add(new AnchoredWord(
+                current.toString(),
+                anchorMs,
+                confidenceCount == 0 ? null : confidenceSum / confidenceCount
+            ));
         }
         return words;
     }
@@ -188,7 +204,7 @@ public final class WhisperDtwWordAligner implements WordAligner {
         for (String original : originalWords) {
             if (normalize(original).isEmpty()) continue;
             TimedText timing = candidates.get(candidateIndex++);
-            preserved.add(new TimedText(original, timing.startMs(), timing.endMs()));
+            preserved.add(new TimedText(original, timing.startMs(), timing.endMs(), timing.confidence()));
         }
         return preserved;
     }
@@ -201,5 +217,5 @@ public final class WhisperDtwWordAligner implements WordAligner {
         return EDGE_PUNCTUATION.matcher(value.toLowerCase(Locale.ROOT).trim()).replaceAll("");
     }
 
-    private record AnchoredWord(String text, long anchorMs) {}
+    private record AnchoredWord(String text, long anchorMs, Double confidence) {}
 }
