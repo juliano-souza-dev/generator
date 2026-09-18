@@ -23,6 +23,7 @@ public final class AppShell {
         root.getStyleClass().add("app-root");
         root.setTop(buildTopBar());
         root.setLeft(buildSidebar());
+        setWaveEnabled(false);
     }
 
     public Parent root() { return root; }
@@ -33,6 +34,10 @@ public final class AppShell {
 
     public void setWaveAction(Runnable action) {
         waveButton.setOnAction(event -> action.run());
+    }
+
+    public void setWaveEnabled(boolean enabled) {
+        waveButton.setDisable(!enabled);
     }
 
     public void show(Node content, ScreenId screen) {
