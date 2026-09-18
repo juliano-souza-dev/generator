@@ -333,6 +333,27 @@ jobs:
             throw "In-place upgrade removed persistent user data"
           }
 
+          $requiredRuntimeFiles = @(
+            (Join-Path $installDir "runtime\bin\java.dll"),
+            (Join-Path $installDir "runtime\bin\java.exe"),
+            (Join-Path $installDir "runtime\bin\javaw.exe"),
+            (Join-Path $installDir "runtime\bin\zip.dll"),
+            (Join-Path $installDir "runtime\bin\nio.dll"),
+            (Join-Path $installDir "runtime\bin\net.dll"),
+            (Join-Path $installDir "runtime\bin\server\jvm.dll"),
+            (Join-Path $installDir "app\tools\whisper\whisper-cli.exe"),
+            (Join-Path $installDir "app\tools\whisper\ggml-base.dll"),
+            (Join-Path $installDir "app\tools\whisper\ggml-cpu.dll"),
+            (Join-Path $installDir "app\tools\whisper\whisper.dll")
+          )
+          foreach ($requiredFile in $requiredRuntimeFiles) {
+            if (-not (Test-Path $requiredFile)) {
+              throw "Upgrade left a required runtime dependency missing: $requiredFile"
+            }
+          }
+
+          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--smoke-test") -TimeoutSeconds 90 -Label "post-upgrade launcher smoke"
+
           Write-Host "PHASE: discover registered uninstaller"
           $uninstallRoots = @(
             "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
