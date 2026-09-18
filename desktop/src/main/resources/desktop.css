@@ -30,6 +30,7 @@
     -fx-background-radius: 8;
 }
 .nav-button:hover { -fx-background-color: #181e28; }
+.nav-button:disabled { -fx-opacity: .35; }
 .nav-button.nav-active {
     -fx-background-color: #202938;
     -fx-text-fill: white;
@@ -51,18 +52,22 @@
     -fx-padding: 10 12;
     -fx-background-radius: 8;
 }
-.source-field {
+.source-field, .time-field {
     -fx-background-color: #141923;
     -fx-text-fill: white;
     -fx-prompt-text-fill: #6f7b8c;
     -fx-border-color: #2c3544;
     -fx-border-radius: 8;
     -fx-background-radius: 8;
-    -fx-padding: 12 14;
+    -fx-padding: 10 12;
+}
+.time-field {
+    -fx-font-family: "Consolas";
+    -fx-font-size: 13px;
 }
 .primary-button, .secondary-button {
     -fx-font-weight: 700;
-    -fx-padding: 11 16;
+    -fx-padding: 10 14;
     -fx-background-radius: 8;
 }
 .primary-button {
@@ -83,4 +88,38 @@
     -fx-border-width: 1;
     -fx-border-radius: 10;
     -fx-background-radius: 10;
+}
+.wave-workspace-java {
+    -fx-padding: 14 0 0 0;
+}
+.video-column {
+    -fx-min-width: 560px;
+    -fx-max-width: 560px;
+}
+.video-shell-java {
+    -fx-min-width: 560px;
+    -fx-min-height: 315px;
+    -fx-background-color: black;
+    -fx-border-color: #293241;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+.wave-column {
+    -fx-min-width: 420px;
+}
+.playhead-label {
+    -fx-text-fill: #ffffff;
+    -fx-font-family: "Consolas";
+    -fx-font-size: 13px;
+}
+.duration-label {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: #141923;
+    -fx-padding: 11 14;
+    -fx-background-radius: 8;
+    -fx-font-family: "Consolas";
+}
+.shortcut-label {
+    -fx-text-fill: #7f8b9d;
+    -fx-font-size: 11px;
 }
