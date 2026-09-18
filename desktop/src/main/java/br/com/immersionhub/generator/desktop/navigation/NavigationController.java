@@ -38,12 +38,21 @@ public final class NavigationController {
         state.navigate(ScreenId.WAVE);
     }
 
+    private void invalidateSource() {
+        sourceMedia = null;
+        shell.setWaveEnabled(false);
+    }
+
+    private SourceView sourceView() {
+        return new SourceView(sourceService, sourceMedia, this::acceptSource, this::invalidateSource);
+    }
+
     private void render(ScreenId screen) {
         Node content = switch (screen) {
-            case SOURCE -> new SourceView(sourceService, sourceMedia, this::acceptSource).root();
+            case SOURCE -> sourceView().root();
             case WAVE -> {
                 if (sourceMedia == null) {
-                    yield new SourceView(sourceService, null, this::acceptSource).root();
+                    yield sourceView().root();
                 }
                 yield new WaveView(sourceMedia, () -> state.navigate(ScreenId.SOURCE)).root();
             }
