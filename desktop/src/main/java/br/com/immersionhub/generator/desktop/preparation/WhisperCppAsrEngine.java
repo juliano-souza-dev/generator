@@ -85,7 +85,8 @@ public final class WhisperCppAsrEngine implements AsrEngine {
                     long wordStart = offsetMs(token, "from");
                     long wordEnd = offsetMs(token, "to");
                     if (!tokenText.isEmpty() && wordEnd > wordStart) {
-                        words.add(new TimedText(tokenText, wordStart, wordEnd));
+                        Double confidence = token.path("p").isNumber() ? token.path("p").asDouble() : null;
+                        words.add(new TimedText(tokenText, wordStart, wordEnd, confidence));
                     }
                 }
             }
