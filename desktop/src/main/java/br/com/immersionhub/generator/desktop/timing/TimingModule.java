@@ -12,4 +12,8 @@ public final class TimingModule {
     public static MediaCutRepository createRepository() {
         return new MediaCutRepository(AppDirectories.workspaceDir().resolve("timing").resolve("media-cut.json"));
     }
+
+    public static TimingDraftRepository createDraftRepository() {
+        return new TimingDraftRepository(AppDirectories.workspaceDir().resolve("timing").resolve("drafts"));
+    }
 }
