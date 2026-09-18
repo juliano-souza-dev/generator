@@ -1,7 +1,32 @@
 # Handoff 004 — Issue #12 → Experience Validator
 
 ## Status
-READY — liberado pelo Orquestrador após aceite formal do Timing Editor Agent.
+CHANGES REQUESTED — a estrutura e navegação foram aprovadas, mas mensagens de falha ainda podem expor detalhes internos.
+
+## Findings
+
+### EV-01 — Source expõe erro bruto do downloader
+Owner: Source Ingestion & Cache Agent
+
+`SourceView` exibe `failure.getMessage()`, e `YtDlpSourceDownloader` pode devolver a última linha bruta da ferramenta.
+
+**Correção exigida:** UI deve receber somente mensagem de produto. Detalhe técnico não pode aparecer ao usuário.
+
+### EV-02 — Wave expõe erro bruto de processamento
+Owner: Timing Editor Agent
+
+`FfmpegMediaProcessor` pode propagar stderr bruto; `WaveView` concatena a mensagem em falhas de waveform/recorte.
+
+**Correção exigida:** Wave deve mostrar mensagens funcionais e neutras, sem nomes de executáveis, codecs, comandos, paths ou stack/details internos.
+
+### EV-03 — Copy dos nudges precisa ser inequívoca
+Owner: Timing Editor Agent
+
+A ajuda atual mostra `Shift 100ms · Alt 1ms`, sem repetir que os modificadores atuam com as setas.
+
+**Correção exigida:** explicitar `Shift+←/→` e `Alt+←/→`.
+
+QA permanece bloqueado.
 
 ## Build sob validação
 Head: `eaf29378286d734541f0707c831332511ff8dd66`
