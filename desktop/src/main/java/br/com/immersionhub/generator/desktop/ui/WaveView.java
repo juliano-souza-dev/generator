@@ -48,7 +48,7 @@ public final class WaveView {
     private TextField inField;
     private TextField outField;
     private Label durationLabel;
-    private Label playheadLabel;
+    private final Label playheadLabel = new Label(Timecode.format(0));
     private Label status;
     private Button saveButton;
 
@@ -161,7 +161,6 @@ public final class WaveView {
     }
 
     private Node playheadHeader() {
-        playheadLabel = new Label(Timecode.format(0));
         playheadLabel.getStyleClass().add("playhead-label");
 
         Label label = new Label("WAVEFORM · ARRASTE IN/OUT · SCROLL PARA PAN");
