@@ -1,7 +1,7 @@
 # Handoff 001 — Issue #4 → Product Cleanup Agent
 
 ## Status
-READY
+DELIVERED
 
 ## Issue
 #4 — [M2] Remover completamente o Dual Scene do produto e do código
@@ -82,3 +82,35 @@ Orquestrador só aceita após:
 - busca final por identificadores Dual Scene sem implementação ativa;
 - Experience Validator confirmar navegação coerente;
 - QA revisar regressões.
+
+## Delivery evidence
+
+### Removed
+- root/config state and PT source exclusive to the retired feature;
+- workspace/media constants and preparation branches;
+- backend helpers, page and API routes;
+- frontend page/script/navigation and dedicated CSS;
+- final renderer/artifact/HUB transport behavior;
+- final-project import behavior;
+- dedicated tests.
+
+### Preserved
+- shared WbW subtitle rendering, renamed to `_write_wbw_ass`;
+- Music renderer;
+- regular YouTube 720p regression coverage;
+- Shadowing flow.
+
+### Regression coverage added/updated
+- retired configuration field is rejected;
+- retired page/API routes are absent;
+- current same-kit reconfiguration preserves reviewed state;
+- WbW vertical subtitle layout/highlight remains covered;
+- regular YouTube quality policy remains covered.
+
+### Search evidence
+Functional backend/frontend/render/import/template files were scanned after the change with no implementation references remaining.
+
+Governance documents under `.github/handoffs/issue-4/` intentionally retain the removed feature name as audit evidence.
+
+### Test execution limitation
+No Python CI workflow is configured to run for PR #20, and no automated run was started. Test execution PASS is therefore **not claimed**.
