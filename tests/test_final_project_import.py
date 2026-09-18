@@ -73,7 +73,7 @@ def test_switch_to_dual_preserves_review_state():
         canonical = Path(temp)/'canonical.json'
         canonical.write_text('{}')
         with patch.object(app,'_read_state',return_value=state), patch.object(app,'_update_state',side_effect=update), patch.object(app,'WORD_TIMING_CANONICAL_FILE',canonical), patch.object(app.shutil,'rmtree') as delete:
-            result = app.configure(app.ConfigureRequest(content_type='kit',dual_scene=True,transcription_mode='external'),BackgroundTasks())
+            result = app.configure(app.ConfigureRequest(content_type='kit',transcription_mode='external'),BackgroundTasks())
             assert result['next_url'] == '/process'
             assert state['word_timing'] == expected
             delete.assert_not_called()
