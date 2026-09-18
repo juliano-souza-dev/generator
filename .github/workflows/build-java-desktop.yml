@@ -36,6 +36,17 @@ jobs:
           mvn -B dependency:copy-dependencies -DoutputDirectory=target/app
           Copy-Item "target/generator-desktop-0.1.0-test.jar" "target/app/generator-desktop.jar"
 
+          New-Item -ItemType Directory -Force -Path "target/app/tools" | Out-Null
+          $toolUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe"
+          $toolPath = "target/app/tools/yt-dlp.exe"
+          Invoke-WebRequest -Uri $toolUrl -OutFile $toolPath
+
+          $expected = "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
+          $actual = (Get-FileHash -Path $toolPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Bundled source tool checksum mismatch"
+          }
+
       - name: Build self-contained app image
         shell: pwsh
         run: jpackage --type app-image --name "ImmersionHub Generator" --dest target/app-image --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub"
@@ -46,6 +57,10 @@ jobs:
           $exe = Resolve-Path "target/app-image/ImmersionHub Generator/ImmersionHub Generator.exe"
           $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -PassThru -Wait
           if ($process.ExitCode -ne 0) { throw "Java desktop smoke test failed with exit code $($process.ExitCode)" }
+
+          $tool = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/yt-dlp.exe"
+          $toolProcess = Start-Process -FilePath $tool -ArgumentList "--version" -PassThru -Wait
+          if ($toolProcess.ExitCode -ne 0) { throw "Bundled source tool smoke test failed" }
 
       - name: Install WiX Toolset
         shell: pwsh
