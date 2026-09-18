@@ -7,7 +7,10 @@ import br.com.immersionhub.generator.desktop.timing.Boundary;
 import br.com.immersionhub.generator.desktop.timing.MediaCutRepository;
 import br.com.immersionhub.generator.desktop.timing.MediaProcessor;
 import br.com.immersionhub.generator.desktop.timing.Timecode;
+import br.com.immersionhub.generator.desktop.timing.TimingDraftRepository;
 import br.com.immersionhub.generator.desktop.timing.TimingFeedback;
+import br.com.immersionhub.generator.desktop.timing.TimingHistory;
+import br.com.immersionhub.generator.desktop.timing.TimingRange;
 import br.com.immersionhub.generator.desktop.timing.TimingSelection;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -20,6 +23,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -32,6 +36,7 @@ import javafx.scene.media.MediaView;
 import javafx.util.Duration;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 public final class WaveView {
@@ -39,8 +44,10 @@ public final class WaveView {
     private final SourceMedia sourceMedia;
     private final MediaProcessor mediaProcessor;
     private final MediaCutRepository cutRepository;
+    private final TimingDraftRepository draftRepository;
     private final Consumer<MediaCut> cutSavedAction;
     private final TimingSelection selection;
+    private final TimingHistory history;
     private final WaveformPane waveformPane = new WaveformPane();
 
     private MediaPlayer player;
@@ -51,12 +58,16 @@ public final class WaveView {
     private Label durationLabel;
     private final Label playheadLabel = new Label(Timecode.format(0));
     private Label status;
+    private Label saveStateLabel;
     private Button saveButton;
+    private Button undoButton;
+    private Button redoButton;
 
     public WaveView(
         SourceMedia sourceMedia,
         MediaProcessor mediaProcessor,
         MediaCutRepository cutRepository,
+        TimingDraftRepository draftRepository,
         MediaCut existingCut,
         Consumer<MediaCut> cutSavedAction,
         Runnable backAction
@@ -64,12 +75,23 @@ public final class WaveView {
         this.sourceMedia = sourceMedia;
         this.mediaProcessor = mediaProcessor;
         this.cutRepository = cutRepository;
+        this.draftRepository = draftRepository;
         this.cutSavedAction = cutSavedAction;
         this.selection = new TimingSelection(sourceMedia.durationMs());
 
-        if (existingCut != null && existingCut.sourceId().equals(sourceMedia.sourceId())) {
+        Optional<TimingRange> restoredDraft = draftRepository.load(
+            sourceMedia.sourceId(),
+            sourceMedia.durationMs()
+        );
+
+        if (restoredDraft.isPresent()) {
+            TimingRange range = restoredDraft.get();
+            selection.setRange(range.startMs(), range.endMs());
+        } else if (existingCut != null && existingCut.sourceId().equals(sourceMedia.sourceId())) {
             selection.setRange(existingCut.startMs(), existingCut.endMs());
         }
+
+        this.history = new TimingHistory(selection.startMs(), selection.endMs());
 
         root.setPadding(new Insets(28, 34, 28, 34));
         root.getStyleClass().add("content-page");
@@ -81,7 +103,9 @@ public final class WaveView {
         Label title = new Label("Wave Editor");
         title.getStyleClass().add("page-title");
 
-        Label source = new Label("Fonte · " + sourceMedia.title() + " · " + Timecode.format(sourceMedia.durationMs()));
+        Label source = new Label(
+            "Fonte · " + sourceMedia.title() + " · " + Timecode.format(sourceMedia.durationMs())
+        );
         source.getStyleClass().add("path-chip");
 
         status = new Label("Preparando waveform…");
@@ -91,12 +115,21 @@ public final class WaveView {
         Node playerNode = buildPlayer();
         Node timingControls = buildTimingControls(backAction);
 
+        if (restoredDraft.isPresent()) {
+            saveStateLabel.setText("Timing recuperado do salvamento automático.");
+        } else if (existingCut != null && existingCut.sourceId().equals(sourceMedia.sourceId())) {
+            saveStateLabel.setText("Timing carregado do último recorte salvo.");
+        } else {
+            saveStateLabel.setText("Sem alterações de timing.");
+        }
+
         waveformPane.setWaveform(List.of(), sourceMedia.durationMs());
         waveformPane.setRange(selection.startMs(), selection.endMs());
         waveformPane.onRangeChanged((start, end) -> {
             selection.setRange(start, end);
             refreshRange();
         });
+        waveformPane.onRangeCommitted(this::commitTimingEdit);
         waveformPane.onSeek(this::seek);
         waveformPane.onBoundarySelected(boundary -> activeBoundary = boundary);
 
@@ -201,25 +234,61 @@ public final class WaveView {
         Button playAll = secondary("▶ Fonte inteira");
         playAll.setOnAction(event -> toggleFullPlayback());
 
+        undoButton = secondary("Desfazer");
+        undoButton.setOnAction(event -> undoTiming());
+
+        redoButton = secondary("Refazer");
+        redoButton.setOnAction(event -> redoTiming());
+
         Label zoomLabel = new Label("Zoom 1.0×");
         zoomLabel.getStyleClass().add("page-copy");
+
         Slider zoom = new Slider(1, 8, 1);
         zoom.setPrefWidth(150);
+
+        ToggleButton superZoom = new ToggleButton("Super Zoom");
+        superZoom.getStyleClass().add("secondary-button");
+        superZoom.setOnAction(event -> {
+            if (superZoom.isSelected()) {
+                zoom.setMax(64);
+                zoomLabel.setText("Super Zoom %.1f×".formatted(zoom.getValue()));
+            } else {
+                zoom.setMax(8);
+                if (zoom.getValue() > 8) zoom.setValue(8);
+                zoomLabel.setText("Zoom %.1f×".formatted(zoom.getValue()));
+            }
+        });
+
         zoom.valueProperty().addListener((obs, oldValue, newValue) -> {
             double value = newValue.doubleValue();
             waveformPane.setZoom(value);
-            zoomLabel.setText("Zoom %.1f×".formatted(value));
+            zoomLabel.setText(
+                (superZoom.isSelected() ? "Super Zoom " : "Zoom ") + "%.1f×".formatted(value)
+            );
         });
 
-        HBox controls = new HBox(8, markIn, markOut, playSelection, playAll, zoom, zoomLabel);
-        controls.setAlignment(Pos.CENTER_LEFT);
+        HBox transport = new HBox(8, markIn, markOut, playSelection, playAll, undoButton, redoButton);
+        transport.setAlignment(Pos.CENTER_LEFT);
 
-        Label shortcuts = new Label("Space seleção · Shift+Space fonte inteira · A IN · S OUT · ←/→ 10ms · Shift+←/→ 100ms · Alt+←/→ 1ms");
+        HBox zoomRow = new HBox(8, zoom, zoomLabel, superZoom);
+        zoomRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label shortcuts = new Label(
+            "Space seleção · Shift+Space fonte inteira · A IN · S OUT · " +
+            "←/→ 10ms · Shift+←/→ 100ms · Alt+←/→ 1ms · " +
+            "Ctrl+Z desfazer · Ctrl+Y refazer · Ctrl+S salvar recorte"
+        );
         shortcuts.getStyleClass().add("shortcut-label");
         shortcuts.setWrapText(true);
 
+        saveStateLabel = new Label();
+        saveStateLabel.getStyleClass().add("save-state-label");
+        saveStateLabel.setWrapText(true);
+
         Button back = secondary("← Source");
-        back.setOnAction(event -> backAction.run());
+        back.setOnAction(event -> {
+            if (autosaveSelection()) backAction.run();
+        });
 
         saveButton = new Button("Salvar recorte");
         saveButton.getStyleClass().add("primary-button");
@@ -228,8 +297,9 @@ public final class WaveView {
         HBox actions = new HBox(10, back, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox box = new VBox(10, timeRow, controls, shortcuts, actions);
+        VBox box = new VBox(10, timeRow, transport, zoomRow, shortcuts, saveStateLabel, actions);
         refreshRange();
+        refreshHistoryButtons();
         return box;
     }
 
@@ -266,7 +336,7 @@ public final class WaveView {
             if (boundary == Boundary.IN) selection.setStartMs(value);
             else selection.setEndMs(value);
             activeBoundary = boundary;
-            refreshRange();
+            commitTimingEdit();
         } catch (Exception exception) {
             status.setText(messageOf(exception));
             refreshRange();
@@ -277,12 +347,55 @@ public final class WaveView {
         long playhead = player == null ? 0 : Math.round(player.getCurrentTime().toMillis());
         selection.mark(boundary, playhead);
         activeBoundary = boundary;
-        refreshRange();
+        commitTimingEdit();
     }
 
     private void nudge(long deltaMs) {
         selection.nudge(activeBoundary, deltaMs);
+        commitTimingEdit();
+    }
+
+    private void commitTimingEdit() {
+        history.record(selection.startMs(), selection.endMs());
         refreshRange();
+        refreshHistoryButtons();
+        autosaveSelection();
+    }
+
+    private void undoTiming() {
+        history.undo().ifPresent(this::applyHistoryRange);
+    }
+
+    private void redoTiming() {
+        history.redo().ifPresent(this::applyHistoryRange);
+    }
+
+    private void applyHistoryRange(TimingRange range) {
+        selection.setRange(range.startMs(), range.endMs());
+        refreshRange();
+        refreshHistoryButtons();
+        autosaveSelection();
+    }
+
+    private boolean autosaveSelection() {
+        try {
+            draftRepository.save(sourceMedia.sourceId(), selection.startMs(), selection.endMs());
+            if (saveStateLabel != null) {
+                saveStateLabel.setText("Timing salvo automaticamente.");
+            }
+            return true;
+        } catch (Exception exception) {
+            if (saveStateLabel != null) {
+                saveStateLabel.setText("Não foi possível salvar o timing automaticamente.");
+            }
+            status.setText("Não foi possível proteger as alterações de timing. Tente novamente.");
+            return false;
+        }
+    }
+
+    private void refreshHistoryButtons() {
+        if (undoButton != null) undoButton.setDisable(!history.canUndo());
+        if (redoButton != null) redoButton.setDisable(!history.canRedo());
     }
 
     private void refreshRange() {
@@ -325,9 +438,28 @@ public final class WaveView {
 
     private void bindShortcuts() {
         root.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            KeyCode code = event.getCode();
+            boolean command = event.isControlDown() || event.isMetaDown();
+
+            if (command && code == KeyCode.S) {
+                saveCut();
+                event.consume();
+                return;
+            }
+            if (command && code == KeyCode.Z) {
+                if (event.isShiftDown()) redoTiming();
+                else undoTiming();
+                event.consume();
+                return;
+            }
+            if (command && code == KeyCode.Y) {
+                redoTiming();
+                event.consume();
+                return;
+            }
+
             if (event.getTarget() instanceof TextInputControl) return;
 
-            KeyCode code = event.getCode();
             if (code == KeyCode.SPACE) {
                 if (event.isShiftDown()) toggleFullPlayback();
                 else toggleSelectionPlayback();
@@ -374,8 +506,11 @@ public final class WaveView {
     }
 
     private void saveCut() {
+        if (saveButton == null || saveButton.isDisabled()) return;
+
         saveButton.setDisable(true);
         status.setText("Salvando recorte…");
+        autosaveSelection();
 
         Task<MediaCut> task = new Task<>() {
             @Override
@@ -395,6 +530,7 @@ public final class WaveView {
             MediaCut cut = task.getValue();
             cutSavedAction.accept(cut);
             status.setText("Recorte salvo · " + Timecode.format(cut.durationMs()));
+            saveStateLabel.setText("Timing salvo automaticamente · recorte gerado.");
             saveButton.setDisable(false);
         });
 
@@ -409,6 +545,7 @@ public final class WaveView {
     }
 
     private void dispose() {
+        autosaveSelection();
         if (player != null) {
             player.stop();
             player.dispose();
