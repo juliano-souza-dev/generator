@@ -246,4 +246,3 @@ jobs:
           path: desktop/target/installer/*.exe
           if-no-files-found: error
           retention-days: 14
-
