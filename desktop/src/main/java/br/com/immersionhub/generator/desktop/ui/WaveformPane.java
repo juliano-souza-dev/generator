@@ -24,9 +24,12 @@ public final class WaveformPane extends Region {
     private BiConsumer<Long, Long> rangeListener = (start, end) -> {};
     private LongConsumer seekListener = value -> {};
     private Consumer<Boundary> boundaryListener = boundary -> {};
+    private Runnable rangeCommitListener = () -> {};
+    private boolean rangeChangedDuringDrag;
 
     public WaveformPane() {
         getChildren().add(canvas);
+        getStyleClass().add("waveform-pane");
         setMinHeight(220);
         setPrefHeight(220);
         setFocusTraversable(true);
@@ -40,9 +43,11 @@ public final class WaveformPane extends Region {
             double outX = msToX(endMs);
             if (Math.abs(event.getX() - inX) <= 12) {
                 dragging = Boundary.IN;
+                rangeChangedDuringDrag = false;
                 boundaryListener.accept(Boundary.IN);
             } else if (Math.abs(event.getX() - outX) <= 12) {
                 dragging = Boundary.OUT;
+                rangeChangedDuringDrag = false;
                 boundaryListener.accept(Boundary.OUT);
             } else {
                 long value = xToMs(event.getX());
@@ -60,11 +65,18 @@ public final class WaveformPane extends Region {
             } else {
                 endMs = viewport.clampOut(value, startMs);
             }
+            rangeChangedDuringDrag = true;
             rangeListener.accept(startMs, endMs);
             redraw();
         });
 
-        setOnMouseReleased(event -> dragging = null);
+        setOnMouseReleased(event -> {
+            if (dragging != null && rangeChangedDuringDrag) {
+                rangeCommitListener.run();
+            }
+            dragging = null;
+            rangeChangedDuringDrag = false;
+        });
 
         setOnScroll(event -> {
             if (viewport.zoom() <= 1.0) return;
@@ -109,6 +121,10 @@ public final class WaveformPane extends Region {
 
     public void onBoundarySelected(Consumer<Boundary> listener) {
         this.boundaryListener = listener == null ? boundary -> {} : listener;
+    }
+
+    public void onRangeCommitted(Runnable listener) {
+        this.rangeCommitListener = listener == null ? () -> {} : listener;
     }
 
     @Override
