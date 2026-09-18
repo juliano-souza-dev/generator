@@ -26,6 +26,7 @@ public final class AppDirectories {
 
     public static Path sourceCacheDir() { return baseDir().resolve("source-cache"); }
     public static Path projectsDir() { return baseDir().resolve("projects"); }
+    public static Path workspaceDir() { return baseDir().resolve("workspace"); }
     public static Path logsDir() { return baseDir().resolve("logs"); }
     public static Path settingsDir() { return baseDir().resolve("settings"); }
 
@@ -33,6 +34,7 @@ public final class AppDirectories {
         try {
             Files.createDirectories(sourceCacheDir());
             Files.createDirectories(projectsDir());
+            Files.createDirectories(workspaceDir());
             Files.createDirectories(logsDir());
             Files.createDirectories(settingsDir());
         } catch (IOException exception) {
