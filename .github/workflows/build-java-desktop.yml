@@ -195,9 +195,11 @@ jobs:
 
           Write-Host "Registered uninstall command: $uninstallCommand"
 
-          if ($uninstallCommand -match '^"([^"]+)"\s*(.*)$') {
-            $uninstallExe = $Matches[1]
-            $uninstallTail = $Matches[2].Trim()
+          if ($uninstallCommand.StartsWith('"')) {
+            $closingQuote = $uninstallCommand.IndexOf('"', 1)
+            if ($closingQuote -lt 2) { throw "Invalid quoted uninstall command: $uninstallCommand" }
+            $uninstallExe = $uninstallCommand.Substring(1, $closingQuote - 1)
+            $uninstallTail = $uninstallCommand.Substring($closingQuote + 1).Trim()
           } else {
             $parts = $uninstallCommand -split '\s+', 2
             $uninstallExe = $parts[0]
