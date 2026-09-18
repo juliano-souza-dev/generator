@@ -7,6 +7,7 @@ import br.com.immersionhub.generator.desktop.timing.Boundary;
 import br.com.immersionhub.generator.desktop.timing.MediaCutRepository;
 import br.com.immersionhub.generator.desktop.timing.MediaProcessor;
 import br.com.immersionhub.generator.desktop.timing.Timecode;
+import br.com.immersionhub.generator.desktop.timing.TimingFeedback;
 import br.com.immersionhub.generator.desktop.timing.TimingSelection;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -147,7 +148,7 @@ public final class WaveView {
                 }
             });
 
-            player.setOnError(() -> status.setText("Não foi possível reproduzir esta fonte."));
+            player.setOnError(() -> status.setText(TimingFeedback.playbackFailure()));
 
             StackPane shell = new StackPane(view);
             shell.getStyleClass().add("video-shell-java");
@@ -155,7 +156,7 @@ public final class WaveView {
         } catch (Exception exception) {
             Label fallback = new Label("A prévia de vídeo não pôde ser aberta.");
             fallback.getStyleClass().add("wave-placeholder");
-            status.setText(messageOf(exception));
+            status.setText(TimingFeedback.playbackFailure());
             return fallback;
         }
     }
@@ -213,7 +214,7 @@ public final class WaveView {
         HBox controls = new HBox(8, markIn, markOut, playSelection, playAll, zoom, zoomLabel);
         controls.setAlignment(Pos.CENTER_LEFT);
 
-        Label shortcuts = new Label("Space seleção · Shift+Space fonte inteira · A IN · S OUT · ←/→ 10ms · Shift 100ms · Alt 1ms");
+        Label shortcuts = new Label("Space seleção · Shift+Space fonte inteira · A IN · S OUT · ←/→ 10ms · Shift+←/→ 100ms · Alt+←/→ 1ms");
         shortcuts.getStyleClass().add("shortcut-label");
         shortcuts.setWrapText(true);
 
@@ -365,7 +366,7 @@ public final class WaveView {
             status.setText("Waveform pronta. Ajuste IN e OUT.");
         });
 
-        task.setOnFailed(event -> status.setText("Não foi possível gerar a waveform: " + messageOf(task.getException())));
+        task.setOnFailed(event -> status.setText(TimingFeedback.waveformFailure()));
 
         Thread worker = new Thread(task, "waveform-reader");
         worker.setDaemon(true);
@@ -398,7 +399,7 @@ public final class WaveView {
         });
 
         task.setOnFailed(event -> {
-            status.setText("Não foi possível salvar o recorte: " + messageOf(task.getException()));
+            status.setText(TimingFeedback.cutFailure());
             saveButton.setDisable(false);
         });
 
