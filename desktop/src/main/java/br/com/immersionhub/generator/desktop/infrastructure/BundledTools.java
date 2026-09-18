@@ -32,6 +32,18 @@ public final class BundledTools {
         );
     }
 
+    public static Path whisperModel() {
+        return resolve(
+            "ihub.whisper.model.path",
+            Path.of("whisper", "models", "ggml-base.en.bin").toString(),
+            List.of(
+                Path.of("tools", "whisper", "models", "ggml-base.en.bin"),
+                Path.of("target", "app", "tools", "whisper", "models", "ggml-base.en.bin")
+            ),
+            "O modelo local de transcrição não foi encontrado."
+        );
+    }
+
     public static Path ffmpeg() {
         return resolve(
             "ihub.ffmpeg.path",
