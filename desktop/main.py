@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import traceback
 import urllib.request
 
 from desktop.paths import prepare_environment
@@ -10,13 +11,16 @@ WINDOW_TITLE = "ImmersionHub Generator"
 
 
 def run_healthcheck() -> int:
-    prepare_environment()
+    data_dir = prepare_environment()
+    error_log = data_dir / "healthcheck-error.log"
+    error_log.unlink(missing_ok=True)
     runtime = DesktopRuntime()
     try:
         url = runtime.start()
         with urllib.request.urlopen(url + "/", timeout=10) as response:
             return 0 if response.status == 200 else 2
     except Exception:
+        error_log.write_text(traceback.format_exc(), encoding="utf-8")
         return 1
     finally:
         runtime.stop()
