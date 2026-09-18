@@ -274,7 +274,7 @@ public final class WaveView {
         zoomRow.setAlignment(Pos.CENTER_LEFT);
 
         Label shortcuts = new Label(
-            "Space seleção · Shift+Space fonte inteira · A IN · S OUT · " +
+            "Space seleção · Shift+Space fonte inteira · A IN · S OUT · G ir para IN · " +
             "←/→ 10ms · Shift+←/→ 100ms · Alt+←/→ 1ms · " +
             "Ctrl+Z desfazer · Ctrl+Y refazer · Ctrl+S salvar recorte"
         );
@@ -473,6 +473,11 @@ public final class WaveView {
             }
             if (code == KeyCode.S) {
                 mark(Boundary.OUT);
+                event.consume();
+                return;
+            }
+            if (code == KeyCode.G) {
+                seek(selection.startMs());
                 event.consume();
                 return;
             }
