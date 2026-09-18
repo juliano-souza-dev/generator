@@ -67,12 +67,6 @@ CUE_TIMING_CANONICAL_FILE = CUE_TIMING_DIR / "canonical_scene_timing_reviewed.js
 CUE_TIMING_WAVEFORM_FILE = CUE_TIMING_DIR / "waveform.json"
 WORD_TIMING_DIR = WORKSPACE_DIR / "word_timing"
 WORD_TIMING_CANONICAL_FILE = WORD_TIMING_DIR / "canonical_scene_word_timing_reviewed.json"
-DUAL_SCENE_DIR = WORKSPACE_DIR / "dual_scene"
-DUAL_SCENE_PT_DIR = DUAL_SCENE_DIR / "pt"
-DUAL_SCENE_PT_FILE = DUAL_SCENE_PT_DIR / "original.mp4"
-DUAL_SCENE_PT_AUDIO_FILE = DUAL_SCENE_PT_DIR / "audio.wav"
-DUAL_SCENE_PT_WAVEFORM_FILE = DUAL_SCENE_DIR / "pt_waveform.json"
-DUAL_SCENE_FILE = DUAL_SCENE_DIR / "dual_scene.json"
 SHADOWING_DIR = WORKSPACE_DIR / "shadowing"
 SHADOWING_PLAN_FILE = SHADOWING_DIR / "shadowing.json"
 CONNECTED_SPEECH_DIR = WORKSPACE_DIR / "connected_speech"
@@ -122,8 +116,7 @@ def _default_state() -> dict[str, Any]:
     return {
         "app": {"name": APP_NAME, "version": APP_VERSION, "build_id": BUILD_ID},
         "en": {"url": "", "validated": False, "embeddable": False, "title": "", "video_id": "", "reason": ""},
-        "pt": {"url": "", "validated": False, "embeddable": False, "title": "", "video_id": "", "reason": ""},
-        "configuration": {"content_type": "", "dual_scene": False, "transcription_mode": "external", "configured": False},
+        "configuration": {"content_type": "", "transcription_mode": "external", "configured": False},
         "wave": {
             "status": "idle",
             "percent": 0,
@@ -198,7 +191,6 @@ def _default_state() -> dict[str, Any]:
             "completed": False,
             "updated_at": "",
         },
-        "dual_scene": {"status": "idle", "blocks": [], "completed": False, "updated_at": ""},
         "shadowing": {
             "status": "idle",
             "source_snapshot_id": "",
@@ -273,8 +265,14 @@ def _read_state() -> dict[str, Any]:
     if not isinstance(data, dict):
         return _default_state()
     base = _default_state()
-    for key in ("en", "pt", "configuration", "wave", "cut", "process", "external_ai", "cue_review", "word_review", "cue_timing", "word_timing", "dual_scene", "shadowing", "connected_speech", "materials_external", "materials_review", "materials_final"):
-        if isinstance(data.get(key), dict):
+    for key in ("en", "configuration", "wave", "cut", "process", "external_ai", "cue_review", "word_review", "cue_timing", "word_timing", "shadowing", "connected_speech", "materials_external", "materials_review", "materials_final"):
+        if not isinstance(data.get(key), dict):
+            continue
+        if key == "configuration":
+            for config_key in ("content_type", "transcription_mode", "configured"):
+                if config_key in data[key]:
+                    base[key][config_key] = data[key][config_key]
+        else:
             base[key].update(data[key])
     base["app"] = _default_state()["app"]
     return base
@@ -441,8 +439,7 @@ def _is_youtube_url(value: str) -> bool:
 
 
 def _reset_after_en_change(state: dict[str, Any]) -> None:
-    state["configuration"] = {"content_type": "", "dual_scene": False, "transcription_mode": "external", "configured": False}
-    state["pt"] = _default_state()["pt"]
+    state["configuration"] = {"content_type": "", "transcription_mode": "external", "configured": False}
     state["wave"] = _default_state()["wave"]
     state["cut"] = _default_state()["cut"]
     state["process"] = _default_state()["process"]
@@ -540,7 +537,7 @@ def _prepare_wave_job(source_url: str) -> None:
             mapped = 8 + int(max(0, min(100, percent)) * 0.62)
             _wave_update(status="running", percent=min(70, mapped), message=f"{stage}: {message}")
 
-        download_video(source_url, SOURCE_EN_DIR, progress=progress, highest_quality=bool((_read_state().get("configuration") or {}).get("dual_scene")))
+        download_video(source_url, SOURCE_EN_DIR, progress=progress)
         if not SOURCE_EN_FILE.is_file() or SOURCE_EN_FILE.stat().st_size <= 0:
             raise RuntimeError("O download terminou sem gerar o vídeo fonte.")
 
@@ -705,12 +702,10 @@ def _build_initial_json(state: dict[str, Any], video_strategy: str, audio_strate
     cut = state["cut"]
     cfg = state["configuration"]
     en = state["en"]
-    pt = state["pt"]
     document: dict[str, Any] = {
         "version": 1,
         "generator": {"name": APP_NAME, "version": APP_VERSION, "build_id": BUILD_ID},
         "content_type": str(cfg.get("content_type") or ""),
-        "dual_scene": bool(cfg.get("dual_scene")),
         "source": {
             "en": {
                 "url": str(en.get("url") or ""),
@@ -740,13 +735,6 @@ def _build_initial_json(state: dict[str, Any], video_strategy: str, audio_strate
         "transcription_mode": str(cfg.get("transcription_mode") or "external"),
         "cues": local_cues or [],
     }
-    if cfg.get("dual_scene"):
-        document["source"]["pt"] = {
-            "url": str(pt.get("url") or ""),
-            "title": str(pt.get("title") or ""),
-            "video_id": str(pt.get("video_id") or ""),
-            "embeddable": bool(pt.get("embeddable")),
-        }
     return document
 
 
@@ -785,8 +773,7 @@ def _process_media_job() -> None:
                 seen_attempts.add(text)
                 _process_update(log=text, level="info")
 
-        dual_scene_quality = bool((state.get("configuration") or {}).get("dual_scene"))
-        download_video(str(state["en"]["url"]), PROCESS_SOURCE_DIR, progress=progress, highest_quality=dual_scene_quality)
+        download_video(str(state["en"]["url"]), PROCESS_SOURCE_DIR, progress=progress)
         if not PROCESS_SOURCE_FILE.is_file() or PROCESS_SOURCE_FILE.stat().st_size <= 0:
             raise RuntimeError("O download terminou sem produzir original.mp4.")
         _process_update(percent=36, message="Vídeo baixado.", log=f"Vídeo baixado · {_human_bytes(PROCESS_SOURCE_FILE.stat().st_size)}", level="success",
@@ -816,16 +803,11 @@ def _process_media_job() -> None:
         if preserve_review_data:
             CUE_TIMING_WAVEFORM_FILE.parent.mkdir(parents=True, exist_ok=True)
             CUE_TIMING_WAVEFORM_FILE.write_text(json.dumps(_generate_waveform(PROCESS_AUDIO_FILE)), encoding="utf-8")
-            if (latest.get("configuration") or {}).get("dual_scene"):
-                download_video(str(latest["pt"]["url"]), DUAL_SCENE_PT_DIR, highest_quality=True)
-                duration = _probe_duration_ms(DUAL_SCENE_PT_FILE)
-                _extract_audio(DUAL_SCENE_PT_FILE, DUAL_SCENE_PT_FILE, DUAL_SCENE_PT_AUDIO_FILE, 0, duration)
-                DUAL_SCENE_PT_WAVEFORM_FILE.write_text(json.dumps(_generate_waveform(DUAL_SCENE_PT_AUDIO_FILE)), encoding="utf-8")
             def media_ready(s: dict[str, Any]) -> None:
                 if s.get("imported_final"):
                     s["imported_final"]["media_pending"] = False
                 if s.get("media_refresh_preserve_reviews"):
-                    s["resume_after_media"] = "/dual-scene" if (s.get("configuration") or {}).get("dual_scene") else "/cue-review"
+                    s["resume_after_media"] = "/cue-review"
                 s.pop("media_refresh_preserve_reviews", None)
             _update_state(media_ready)
         _process_update(status="ready", percent=100, message="Mídia pronta em qualidade máxima. Cues e revisões preservadas." if preserve_review_data else "Processamento concluído.", log="Processamento concluído. Todos os artefatos estão disponíveis para download.", level="success", finished=True)
@@ -845,7 +827,6 @@ def _process_input_signature(state: dict[str, Any]) -> dict[str, Any]:
         "start_ms": int(cut.get("start_ms") or 0),
         "end_ms": int(cut.get("end_ms") or 0),
         "content_type": str(cfg.get("content_type") or ""),
-        "dual_scene": bool(cfg.get("dual_scene")),
         "transcription_mode": str(cfg.get("transcription_mode") or "external"),
     }
 
@@ -2353,10 +2334,7 @@ def _word_timing_payload(*, include_waveform: bool = True) -> dict[str, Any]:
             "key": _word_timing_key(current_cue, current_unit),
             "accepted": _word_timing_key(current_cue, current_unit) in accepted,
         },
-        "next_stage": {
-            "kind": "dual_scene" if bool((_read_state().get("configuration") or {}).get("dual_scene")) else "shadowing",
-            "url": "/dual-scene" if bool((_read_state().get("configuration") or {}).get("dual_scene")) else "/shadowing",
-        },
+        "next_stage": {"kind": "shadowing", "url": "/shadowing"},
     }
     if include_waveform:
         try:
@@ -2399,93 +2377,7 @@ def _apply_word_unit_range(cue: dict[str, Any], unit_index: int, start_ms: int, 
     words[members[-1]]["end_ms"] = end_ms
 
 
-def _dual_scene_ready(state: dict[str, Any]) -> bool:
-    return bool(
-        (state.get("configuration") or {}).get("dual_scene")
-        and (state.get("word_timing") or {}).get("completed")
-        and WORD_TIMING_CANONICAL_FILE.is_file()
-        and PROCESS_VIDEO_FILE.is_file()
-    )
-
-
-def _dual_scene_cues(document: dict[str, Any]) -> list[dict[str, Any]]:
-    return [{
-        "order": int(cue.get("order") or index),
-        "en": str(cue.get("approved_en") or cue.get("original_en") or ""),
-        "pt": str(cue.get("pt") or ""),
-        "start_ms": int(cue.get("speech_start_ms") or 0),
-        "end_ms": int(cue.get("speech_end_ms") or 0),
-        "words": copy.deepcopy([word for word in (cue.get("words") or []) if isinstance(word, dict)]),
-    } for index, cue in enumerate(document.get("cues") or [], start=1)]
-
-
-def _normalize_dual_scene_blocks(raw_blocks: Any, document: dict[str, Any], en_duration_ms: int, pt_duration_ms: int) -> list[dict[str, Any]]:
-    if not isinstance(raw_blocks, list) or not raw_blocks:
-        raise ValueError("Crie pelo menos um bloco Dual Scene.")
-    cues = _dual_scene_cues(document)
-    normalized: list[dict[str, Any]] = []
-    for index, raw in enumerate(raw_blocks, start=1):
-        if not isinstance(raw, dict):
-            raise ValueError(f"Bloco {index} inválido.")
-        en_start = int(raw.get("en_start_ms") or 0)
-        en_end = int(raw.get("en_end_ms") or 0)
-        pt_start = int(raw.get("pt_start_ms") or 0)
-        pt_end = int(raw.get("pt_end_ms") or 0)
-        if en_start < 0 or en_end <= en_start or en_end > en_duration_ms:
-            raise ValueError(f"IN/OUT EN inválido no bloco {index}.")
-        if pt_start < 0 or pt_end <= pt_start or (pt_duration_ms > 0 and pt_end > pt_duration_ms):
-            raise ValueError(f"IN/OUT PT inválido no bloco {index}.")
-        cue_orders = [cue["order"] for cue in cues if cue["end_ms"] > en_start and cue["start_ms"] < en_end]
-        if not cue_orders:
-            raise ValueError(f"O bloco {index} EN precisa intersectar pelo menos uma cue.")
-        normalized.append({
-            "video": index,
-            "cueOrder": cue_orders[0],
-            "cueStartOrder": cue_orders[0],
-            "cueEndOrder": cue_orders[-1],
-            "cueOrders": cue_orders,
-            "en": {"source": "scene", "youtube": str((_read_state().get("en") or {}).get("url") or ""), "start_ms": en_start, "end_ms": en_end},
-            "pt": {"source": "dual_scene_pt", "youtube": str((_read_state().get("pt") or {}).get("url") or ""), "start_ms": pt_start, "end_ms": pt_end},
-            "transition": {"visual_fade_ms": 120, "audio_fade_ms": 80},
-        })
-    return normalized
-
-
-def _dual_scene_payload() -> dict[str, Any]:
-    state = _read_state()
-    if not _dual_scene_ready(state):
-        raise RuntimeError("Conclua o WbW Time de um projeto Dual Scene.")
-    document = json.loads(WORD_TIMING_CANONICAL_FILE.read_text(encoding="utf-8"))
-    project = document.get("project") if isinstance(document.get("project"), dict) else {}
-    en_youtube_offset = int(project.get("media_source_start_ms", project.get("source_video_start_ms") or project.get("scene_start_ms") or 0))
-    en_duration = _probe_duration_ms(PROCESS_VIDEO_FILE)
-    pt_duration = _probe_duration_ms(DUAL_SCENE_PT_FILE) if DUAL_SCENE_PT_FILE.is_file() else 0
-    review = state.get("dual_scene") or {}
-    blocks = copy.deepcopy(review.get("blocks") or [])
-    cues = _dual_scene_cues(document)
-    if not blocks and cues:
-        start = cues[0]["start_ms"]
-        end = cues[0]["end_ms"]
-        blocks = [{"id": "block-1", "en_start_ms": start, "en_end_ms": end, "pt_start_ms": 0, "pt_end_ms": min(pt_duration or max(1, end-start), max(1, end-start))}]
-    try:
-        en_waveform = json.loads(CUE_TIMING_WAVEFORM_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        en_waveform = _generate_waveform(PROCESS_AUDIO_FILE, points=2400)
-    try:
-        pt_waveform = json.loads(DUAL_SCENE_PT_WAVEFORM_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        pt_waveform = []
-    return {
-        "status": review.get("status") or "editing", "completed": bool(review.get("completed")),
-        "blocks": blocks, "cues": cues,
-        "en": {"media_url": "/media/process/output/scene_video.mp4", "youtube_url": str((state.get("en") or {}).get("url") or ""), "youtube_offset_ms": en_youtube_offset, "duration_ms": en_duration, "waveform": en_waveform},
-        "pt": {"media_url": "/media/dual_scene/pt/original.mp4" if DUAL_SCENE_PT_FILE.is_file() else "", "youtube_url": str((state.get("pt") or {}).get("url") or ""), "duration_ms": pt_duration, "waveform": pt_waveform, "prepared": DUAL_SCENE_PT_FILE.is_file()},
-    }
-
-
-
 def _shadowing_page_ready(state: dict[str, Any]) -> bool:
-    cfg = state.get("configuration") or {}
     review = state.get("word_timing") or {}
     return bool(
         _word_timing_page_ready(state)
@@ -2493,7 +2385,6 @@ def _shadowing_page_ready(state: dict[str, Any]) -> bool:
         and WORD_TIMING_CANONICAL_FILE.is_file()
         and PROCESS_VIDEO_FILE.is_file()
         and PROCESS_AUDIO_FILE.is_file()
-        and not bool(cfg.get("dual_scene"))
     )
 
 
@@ -2637,9 +2528,6 @@ def _build_shadowing_plan(document: dict[str, Any], markers: Any, end_ms: int | 
 def _ensure_shadowing() -> tuple[dict[str, Any], dict[str, Any], int]:
     state = _read_state()
     if not _shadowing_page_ready(state):
-        cfg = state.get("configuration") or {}
-        if bool(cfg.get("dual_scene")):
-            raise RuntimeError("Este projeto usa Dual Scene. O ramo Dual Scene será a próxima implementação.")
         raise RuntimeError("Conclua o WbW Time antes de configurar o Shadowing.")
     source = json.loads(WORD_TIMING_CANONICAL_FILE.read_text(encoding="utf-8"))
     source_snapshot_id = str(source.get("snapshot_id") or "")
@@ -2723,8 +2611,6 @@ def _shadowing_payload(*, include_waveform: bool = True) -> dict[str, Any]:
 
 
 def _connected_speech_page_ready(state: dict[str, Any]) -> bool:
-    if bool((state.get("configuration") or {}).get("dual_scene")):
-        return False
     try:
         _document, review, _duration_ms = _ensure_shadowing()
     except Exception:
@@ -3200,30 +3086,20 @@ def _materials_external_inputs() -> tuple[dict[str, Any], dict[str, Any], str, s
         raise RuntimeError("JSON canônico final não encontrado.")
     canonical = json.loads(WORD_TIMING_CANONICAL_FILE.read_text(encoding="utf-8"))
     content_type = str(((canonical.get("project") or {}).get("content_type") or "dialogue"))
-    if bool((state.get("configuration") or {}).get("dual_scene")):
-        dual = state.get("dual_scene") or {}
-        if not bool(dual.get("completed")) or not DUAL_SCENE_FILE.is_file() or not canonical.get("dualScene"):
-            raise RuntimeError("Conclua o Dual Scene antes dos materiais.")
-        cs_review = {
-            "schema": "immersionhub-connected-speech-review", "schema_version": "1.0",
-            "source_snapshot_id": str(canonical.get("snapshot_id") or ""), "completed": True,
-            "disabled_for_content_type": "dual_scene", "items": [],
-        }
-    else:
-        # Scene and Music proceed from finalized Shadowing directly to materials.
-        shadowing = state.get("shadowing") or {}
-        if not bool(shadowing.get("completed")) or not SHADOWING_PLAN_FILE.is_file():
-            raise RuntimeError("Conclua o Shadowing antes dos materiais.")
-        # Connected Speech is retired. Keep a deterministic
-        # empty review only to preserve the shared materials identity contract.
-        cs_review = {
-            "schema": "immersionhub-connected-speech-review",
-            "schema_version": "1.0",
-            "source_snapshot_id": str(canonical.get("snapshot_id") or ""),
-            "completed": True,
-            "disabled_for_content_type": content_type,
-            "items": [],
-        }
+    # Scene and Music proceed from finalized Shadowing directly to materials.
+    shadowing = state.get("shadowing") or {}
+    if not bool(shadowing.get("completed")) or not SHADOWING_PLAN_FILE.is_file():
+        raise RuntimeError("Conclua o Shadowing antes dos materiais.")
+    # Connected Speech is retired. Keep a deterministic
+    # empty review only to preserve the shared materials identity contract.
+    cs_review = {
+        "schema": "immersionhub-connected-speech-review",
+        "schema_version": "1.0",
+        "source_snapshot_id": str(canonical.get("snapshot_id") or ""),
+        "completed": True,
+        "disabled_for_content_type": content_type,
+        "items": [],
+    }
     canonical_sha = hashlib.sha256(
         json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -3620,7 +3496,7 @@ def _materials_final_identity() -> str:
     settings = public_ai_settings()
     inputs["tts"] = {"tts_model": settings.get("tts_model"), "tts_voices": list(MATERIALS_TTS_VOICES)}
     inputs["title"] = (_read_state().get("en") or {}).get("title")
-    inputs["media"] = [(p.name, p.stat().st_size, p.stat().st_mtime_ns) if p.is_file() else (p.name, None) for p in (PROCESS_VIDEO_FILE, DUAL_SCENE_PT_FILE)]
+    inputs["media"] = [(PROCESS_VIDEO_FILE.name, PROCESS_VIDEO_FILE.stat().st_size, PROCESS_VIDEO_FILE.stat().st_mtime_ns) if PROCESS_VIDEO_FILE.is_file() else (PROCESS_VIDEO_FILE.name, None)]
     inputs["implementation"] = [hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__), Path(__file__).with_name("materials_final.py"))]
     return content_digest(inputs)
 
@@ -3686,9 +3562,7 @@ def _materials_final_job(
                 _materials_final_progress(mapped, message)
 
             is_music = str(((canonical.get("project") or {}).get("content_type") or "")) == "music"
-            if canonical.get("dualScene"):
-                shadowing_plan = {}
-            elif not SHADOWING_PLAN_FILE.is_file():
+            if not SHADOWING_PLAN_FILE.is_file():
                 stage_failures.append({"id": "hub_json", "label": "hub_final.json", "error": "shadowing.json aprovado não encontrado."})
                 shadowing_plan = {}
             else:
@@ -3708,8 +3582,6 @@ def _materials_final_job(
                 tts_voice_dirs={voice: MATERIALS_TTS_DIR / voice for voice in MATERIALS_TTS_VOICES},
                 output_dir=MATERIALS_FINAL_OUTPUT_DIR,
                 source_title=source_title,
-                dual_scene_en_video=PROCESS_VIDEO_FILE,
-                dual_scene_pt_video=DUAL_SCENE_PT_FILE,
                 music_source_video=PROCESS_VIDEO_FILE,
                 shadowing_source_video=PROCESS_VIDEO_FILE,
                 progress=render_progress,
@@ -3827,12 +3699,11 @@ def _materials_final_job(
 
 class ValidateYouTubeRequest(BaseModel):
     video_url: str
-    role: Literal["en", "pt"] = "en"
+    role: Literal["en"] = "en"
 
 
 class ConfigureRequest(BaseModel):
     content_type: Literal["kit", "music"]
-    dual_scene: bool = False
     transcription_mode: Literal["generator", "external"] = "external"
 
 
@@ -3953,10 +3824,6 @@ class WordTimingRealignRequest(BaseModel):
     anchor_end_ms: int
 
 
-class DualSceneBlocksRequest(BaseModel):
-    blocks: list[dict[str, Any]] = []
-
-
 class ShadowingDraftRequest(BaseModel):
     pause_markers_ms: list[int] = []
     end_ms: int | None = None
@@ -3995,10 +3862,6 @@ def _wave_page_ready(state: dict[str, Any]) -> bool:
     content_type = str(cfg.get("content_type") or "")
     if not (cfg.get("configured") and content_type in {"kit", "music"}):
         return False
-    if content_type == "kit" and cfg.get("dual_scene"):
-        pt = state.get("pt") or {}
-        if not (pt.get("validated") and pt.get("embeddable") and pt.get("url")):
-            return False
     return True
 
 
@@ -4088,19 +3951,9 @@ def word_timing_page():
     return FileResponse(STATIC_DIR / "word_timing.html")
 
 
-@app.get("/dual-scene", include_in_schema=False)
-def dual_scene_page():
-    state = _read_state()
-    if not _dual_scene_ready(state):
-        return RedirectResponse(url="/word-timing", status_code=307)
-    return FileResponse(STATIC_DIR / "dual_scene.html")
-
-
 @app.get("/shadowing", include_in_schema=False)
 def shadowing_page():
     state = _read_state()
-    if bool((state.get("configuration") or {}).get("dual_scene")):
-        return RedirectResponse(url="/word-timing", status_code=307)
     if not _shadowing_page_ready(state):
         return RedirectResponse(url="/word-timing", status_code=307)
     return FileResponse(STATIC_DIR / "shadowing.html")
@@ -4384,10 +4237,6 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
     if not (en.get("validated") and en.get("embeddable") and en.get("url")):
         raise HTTPException(status_code=409, detail="Valide primeiro um vídeo EN que permita incorporação.")
 
-    # Dual Scene is retired. The field remains in ConfigureRequest only for
-    # backward-compatible payload parsing; active configuration always disables it.
-    request.dual_scene = False
-
     previous_configuration = state.get("configuration") or {}
     preserve_reviews = (
         bool(previous_configuration.get("configured"))
@@ -4399,7 +4248,6 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
     configuration_unchanged = (
         bool(previous_configuration.get("configured"))
         and str(previous_configuration.get("content_type") or "") == request.content_type
-        and not bool(previous_configuration.get("dual_scene"))
         and str(previous_configuration.get("transcription_mode") or "external") == request.transcription_mode
     )
 
@@ -4408,12 +4256,10 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
         unchanged = (
             bool(previous.get("configured"))
             and str(previous.get("content_type") or "") == request.content_type
-            and not bool(previous.get("dual_scene"))
             and str(previous.get("transcription_mode") or "external") == request.transcription_mode
         )
         s["configuration"] = {
             "content_type": request.content_type,
-            "dual_scene": False,
             "transcription_mode": request.transcription_mode,
             "configured": True,
         }
@@ -4427,7 +4273,6 @@ def configure(request: ConfigureRequest, background_tasks: BackgroundTasks):
         s["cue_review"] = _default_state()["cue_review"]
         s["cue_timing"] = _default_state()["cue_timing"]
         s["word_timing"] = _default_state()["word_timing"]
-        s["dual_scene"] = _default_state()["dual_scene"]
     state = _update_state(configured_state)
     if preserve_reviews:
         return {"ok": True, "preserved": True, "next_url": "/shadowing", "wave_started": False}
@@ -4531,7 +4376,7 @@ def start_process(background_tasks: BackgroundTasks, force: bool = False):
 @app.get("/api/process/status")
 def process_status():
     state = _read_state()
-    return {**state["process"], "next_url": str(state.get("resume_after_media") or (("/dual-scene" if (state.get("configuration") or {}).get("dual_scene") else "/cue-review") if (state.get("imported_final") or state.get("media_refresh_preserve_reviews")) else "/external-ai"))}
+    return {**state["process"], "next_url": str(state.get("resume_after_media") or ("/cue-review" if (state.get("imported_final") or state.get("media_refresh_preserve_reviews")) else "/external-ai"))}
 
 
 @app.get("/api/process/artifact/{artifact_key}")
@@ -6130,76 +5975,6 @@ def word_timing_canonical():
     return FileResponse(WORD_TIMING_CANONICAL_FILE, media_type="application/json", filename="canonical_scene_word_timing_reviewed.json")
 
 
-@app.get("/api/dual-scene/state")
-def dual_scene_state_api():
-    try:
-        return {"ok": True, "review": _dual_scene_payload()}
-    except Exception as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-
-@app.post("/api/dual-scene/prepare-pt")
-def dual_scene_prepare_pt_api():
-    state = _read_state()
-    if not _dual_scene_ready(state):
-        raise HTTPException(status_code=409, detail="O projeto Dual Scene ainda não está pronto.")
-    pt_url = str((state.get("pt") or {}).get("url") or "").strip()
-    if not pt_url:
-        raise HTTPException(status_code=409, detail="A fonte PT não está configurada.")
-    try:
-        shutil.rmtree(DUAL_SCENE_PT_DIR, ignore_errors=True)
-        DUAL_SCENE_PT_DIR.mkdir(parents=True, exist_ok=True)
-        download_video(pt_url, DUAL_SCENE_PT_DIR, highest_quality=True)
-        if not DUAL_SCENE_PT_FILE.is_file():
-            raise RuntimeError("O download PT não produziu um vídeo válido.")
-        duration = _probe_duration_ms(DUAL_SCENE_PT_FILE)
-        _extract_audio(DUAL_SCENE_PT_FILE, DUAL_SCENE_PT_FILE, DUAL_SCENE_PT_AUDIO_FILE, 0, duration)
-        waveform = _generate_waveform(DUAL_SCENE_PT_AUDIO_FILE, points=2400)
-        DUAL_SCENE_PT_WAVEFORM_FILE.write_text(json.dumps(waveform, ensure_ascii=False) + "\n", encoding="utf-8")
-        def prepared(s: dict[str, Any]) -> None:
-            s["dual_scene"].update({"status": "editing", "completed": False, "updated_at": _now_iso()})
-        _update_state(prepared)
-        return {"ok": True, "review": _dual_scene_payload()}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@app.put("/api/dual-scene/state")
-def dual_scene_save_api(request: DualSceneBlocksRequest):
-    state = _read_state()
-    if not _dual_scene_ready(state):
-        raise HTTPException(status_code=409, detail="O projeto Dual Scene ainda não está pronto.")
-    if not DUAL_SCENE_PT_FILE.is_file():
-        raise HTTPException(status_code=409, detail="Prepare o vídeo PT antes de salvar os blocos.")
-    document = json.loads(WORD_TIMING_CANONICAL_FILE.read_text(encoding="utf-8"))
-    try:
-        canonical = _normalize_dual_scene_blocks(request.blocks, document, _probe_duration_ms(PROCESS_VIDEO_FILE), _probe_duration_ms(DUAL_SCENE_PT_FILE))
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    blocks = [{"id": f"block-{index}", "en_start_ms": item["en"]["start_ms"], "en_end_ms": item["en"]["end_ms"], "pt_start_ms": item["pt"]["start_ms"], "pt_end_ms": item["pt"]["end_ms"]} for index, item in enumerate(canonical, start=1)]
-    DUAL_SCENE_DIR.mkdir(parents=True, exist_ok=True)
-    DUAL_SCENE_FILE.write_text(json.dumps({"version": 1, "completed": False, "dualScene": canonical}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    def saved(s: dict[str, Any]) -> None:
-        s["dual_scene"].update({"status": "editing", "blocks": blocks, "completed": False, "updated_at": _now_iso()})
-    _update_state(saved)
-    return {"ok": True, "review": _dual_scene_payload()}
-
-
-@app.post("/api/dual-scene/finalize")
-def dual_scene_finalize_api(request: DualSceneBlocksRequest):
-    dual_scene_save_api(request)
-    document = json.loads(WORD_TIMING_CANONICAL_FILE.read_text(encoding="utf-8"))
-    saved = json.loads(DUAL_SCENE_FILE.read_text(encoding="utf-8"))
-    document["dualScene"] = saved["dualScene"]
-    WORD_TIMING_CANONICAL_FILE.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    saved["completed"] = True
-    DUAL_SCENE_FILE.write_text(json.dumps(saved, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    def finalized(s: dict[str, Any]) -> None:
-        s["dual_scene"].update({"status": "completed", "completed": True, "updated_at": _now_iso()})
-    _update_state(finalized)
-    return {"ok": True, "next_url": "/materials-external", "review": _dual_scene_payload()}
-
-
 @app.get("/api/shadowing/state")
 def shadowing_state():
     try:
@@ -6459,8 +6234,7 @@ def connected_speech_review_result():
 @app.get("/api/materials-external/state")
 def materials_external_state():
     if not _materials_external_page_ready():
-        content_type = str(((_read_state().get("configuration") or {}).get("content_type") or "kit"))
-        detail = "Conclua o Shadowing ou Dual Scene antes dos materiais."
+        detail = "Conclua o Shadowing antes dos materiais."
         raise HTTPException(status_code=409, detail=detail)
     try:
         prepared = _prepare_materials_external_package()
@@ -6480,8 +6254,7 @@ def materials_external_state():
 @app.post("/api/materials-external/prepare")
 def materials_external_prepare():
     if not _materials_external_page_ready():
-        content_type = str(((_read_state().get("configuration") or {}).get("content_type") or "kit"))
-        detail = "Conclua o Shadowing ou Dual Scene antes dos materiais."
+        detail = "Conclua o Shadowing antes dos materiais."
         raise HTTPException(status_code=409, detail=detail)
     try:
         prepared = _prepare_materials_external_package()
@@ -6493,8 +6266,7 @@ def materials_external_prepare():
 @app.post("/api/materials-external/rebuild")
 def materials_external_rebuild():
     if not _materials_external_page_ready():
-        content_type = str(((_read_state().get("configuration") or {}).get("content_type") or "kit"))
-        detail = "Conclua o Shadowing ou Dual Scene antes dos materiais."
+        detail = "Conclua o Shadowing antes dos materiais."
         raise HTTPException(status_code=409, detail=detail)
 
     try:
@@ -6515,8 +6287,7 @@ def materials_external_rebuild():
 @app.post("/api/materials-external/import")
 async def materials_external_import(request: Request, filename: str = "materials_external_ai_return.json"):
     if not _materials_external_page_ready():
-        content_type = str(((_read_state().get("configuration") or {}).get("content_type") or "kit"))
-        detail = "Conclua o Shadowing ou Dual Scene antes dos materiais."
+        detail = "Conclua o Shadowing antes dos materiais."
         raise HTTPException(status_code=409, detail=detail)
     try:
         canonical, cs_review, canonical_sha, cs_sha = _materials_external_inputs()
