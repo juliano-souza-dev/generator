@@ -88,13 +88,18 @@ jobs:
           $timing = Start-Process -FilePath $exe -ArgumentList @("--timing-smoke", $sample) -PassThru -Wait
           if ($timing.ExitCode -ne 0) { throw "Packaged timing pipeline smoke test failed with exit code $($timing.ExitCode)" }
 
-      - name: Install WiX Toolset
+      - name: Install Inno Setup
         shell: pwsh
-        run: choco install wixtoolset --no-progress -y
+        run: choco install innosetup --no-progress -y
 
       - name: Build Windows installer
         shell: pwsh
-        run: jpackage --type exe --name "ImmersionHub Generator" --dest target/installer --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub" --description "ImmersionHub Generator Desktop" --win-per-user-install --win-menu --win-shortcut --win-dir-chooser --install-dir "Programs\\ImmersionHub Generator" --win-upgrade-uuid "4f32c0b7-2b58-4f4e-9e27-1d4b8aab5c12"
+        run: |
+          New-Item -ItemType Directory -Force -Path "target/installer" | Out-Null
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler was not found" }
+          & $iscc "installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
 
       - name: Install and smoke test generated Setup
         shell: pwsh
@@ -127,7 +132,7 @@ jobs:
 
           $installLog = Join-Path (Get-Location) "target/installer-install.log"
           try {
-            Invoke-BoundedProcess -FilePath $installer.FullName -Arguments @("/quiet", "/norestart", "/log", $installLog) -TimeoutSeconds 180 -Label "EXE install"
+            Invoke-BoundedProcess -FilePath $installer.FullName -Arguments @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$installLog") -TimeoutSeconds 180 -Label "EXE install"
           } catch {
             if (Test-Path $installLog) {
               Write-Host "===== installer log ====="
@@ -177,20 +182,19 @@ jobs:
             throw "Registered uninstaller for ImmersionHub Generator was not found"
           }
 
-          $uninstallCommand = if ($entry.QuietUninstallString) {
+          $hasQuietUninstall = -not [string]::IsNullOrWhiteSpace([string]$entry.QuietUninstallString)
+          $uninstallCommand = if ($hasQuietUninstall) {
             [string]$entry.QuietUninstallString
           } else {
             [string]$entry.UninstallString
           }
 
-          Write-Host "Registered uninstall command: $uninstallCommand"
-
-          if ($uninstallCommand -match '(?i)\{[0-9A-F-]{36}\}') {
-            $productCode = $Matches[0]
-            Invoke-BoundedProcess -FilePath "$env:SystemRoot\System32\msiexec.exe" -Arguments @("/x", $productCode, "/qn", "/norestart") -TimeoutSeconds 180 -Label "registered MSI uninstall"
-          } else {
-            Invoke-BoundedProcess -FilePath "cmd.exe" -Arguments @("/d", "/s", "/c", "$uninstallCommand /quiet /norestart") -TimeoutSeconds 180 -Label "registered uninstall"
+          if (-not $hasQuietUninstall) {
+            $uninstallCommand = "$uninstallCommand /VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
           }
+
+          Write-Host "Registered uninstall command: $uninstallCommand"
+          Invoke-BoundedProcess -FilePath "cmd.exe" -Arguments @("/d", "/s", "/c", $uninstallCommand) -TimeoutSeconds 180 -Label "registered uninstall"
 
           if (Test-Path $installedExe) {
             throw "Installed launcher still exists after uninstall"
