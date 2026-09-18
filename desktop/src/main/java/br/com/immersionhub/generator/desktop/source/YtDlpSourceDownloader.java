@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -27,7 +29,7 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
     private final Supplier<Path> ffmpegSupplier;
     private final CommandRunner commandRunner;
     private final Sleeper sleeper;
-    private final SourceDownloadDiagnostics diagnostics;
+    private final Path logFile;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public YtDlpSourceDownloader() {
@@ -36,7 +38,7 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
             BundledTools::ffmpeg,
             YtDlpSourceDownloader::runProcess,
             Thread::sleep,
-            new SourceDownloadDiagnostics(AppDirectories.logsDir().resolve("source-download.log"))
+            AppDirectories.logsDir().resolve("source-download.log")
         );
     }
 
@@ -45,13 +47,13 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
         Supplier<Path> ffmpegSupplier,
         CommandRunner commandRunner,
         Sleeper sleeper,
-        SourceDownloadDiagnostics diagnostics
+        Path logFile
     ) {
         this.executableSupplier = executableSupplier;
         this.ffmpegSupplier = ffmpegSupplier;
         this.commandRunner = commandRunner;
         this.sleeper = sleeper;
-        this.diagnostics = diagnostics;
+        this.logFile = logFile.toAbsolutePath().normalize();
     }
 
     @Override
@@ -114,7 +116,7 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
                 Optional<Path> media = findDownloadedMedia(targetDirectory);
                 if (media.isPresent()) return media.get();
 
-                diagnostics.result(
+                logResult(
                     "download",
                     1,
                     strategy.name() + "-missing-output",
@@ -149,17 +151,17 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
         for (int attempt = 1; attempt <= MAX_TRANSIENT_ATTEMPTS; attempt++) {
             try {
                 CommandResult result = commandRunner.run(command);
-                diagnostics.result(stage, attempt, strategy, result.exitCode(), result.output());
+                logResult(stage, attempt, strategy, result.exitCode(), result.output());
                 last = result;
 
                 if (result.exitCode() == 0) return result;
                 if (isDefinitiveFailure(result.output()) || isFormatUnavailable(result.output())) return result;
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
-                diagnostics.failure(stage, attempt, strategy, interrupted);
+                logFailure(stage, attempt, strategy, interrupted);
                 throw interrupted;
             } catch (Exception failure) {
-                diagnostics.failure(stage, attempt, strategy, failure);
+                logFailure(stage, attempt, strategy, failure);
                 if (attempt == MAX_TRANSIENT_ATTEMPTS) throw failure;
             }
 
@@ -193,6 +195,42 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
             });
         } catch (IOException ignored) {
         }
+    }
+
+    private synchronized void logResult(String stage, int attempt, String strategy, int exitCode, String output) {
+        appendLog("stage=" + stage
+            + " attempt=" + attempt
+            + " strategy=" + strategy
+            + " exit=" + exitCode
+            + " output=" + compactLog(output));
+    }
+
+    private synchronized void logFailure(String stage, int attempt, String strategy, Throwable failure) {
+        String message = failure == null ? "" : failure.getClass().getSimpleName() + ": " + failure.getMessage();
+        appendLog("stage=" + stage
+            + " attempt=" + attempt
+            + " strategy=" + strategy
+            + " exception=" + compactLog(message));
+    }
+
+    private void appendLog(String message) {
+        try {
+            Files.createDirectories(logFile.getParent());
+            Files.writeString(
+                logFile,
+                Instant.now() + " " + message + System.lineSeparator(),
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND
+            );
+        } catch (Exception ignored) {
+            // Diagnostics must never break Source acquisition.
+        }
+    }
+
+    private static String compactLog(String text) {
+        if (text == null || text.isBlank()) return "<empty>";
+        String compacted = text.replace('\r', ' ').replace('\n', ' ').replaceAll("\\s+", " ").trim();
+        return compacted.length() <= 4000 ? compacted : compacted.substring(0, 4000) + "…";
     }
 
     private static CommandResult runProcess(List<String> command) throws Exception {
