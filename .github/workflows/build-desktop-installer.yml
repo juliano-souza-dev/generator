@@ -46,6 +46,12 @@ jobs:
           $exe = Resolve-Path "dist/ImmersionHubGenerator/ImmersionHubGenerator.exe"
           $process = Start-Process -FilePath $exe -ArgumentList "--healthcheck" -PassThru -Wait
           if ($process.ExitCode -ne 0) {
+            $errorLog = Join-Path $env:LOCALAPPDATA "ImmersionHub Generator\healthcheck-error.log"
+            if (Test-Path $errorLog) {
+              Write-Host "===== packaged healthcheck traceback ====="
+              Get-Content $errorLog
+              Write-Host "========================================="
+            }
             throw "Packaged Generator healthcheck failed with exit code $($process.ExitCode)"
           }
 
