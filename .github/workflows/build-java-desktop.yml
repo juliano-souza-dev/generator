@@ -135,6 +135,7 @@ jobs:
             "-l", "en",
             "-ng",
             "-dtw", "base.en",
+            "-nfa",
             "-ojf",
             "-of", [string]$whisperSmokePrefix
           )) {
