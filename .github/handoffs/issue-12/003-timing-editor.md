@@ -120,3 +120,31 @@ Retornar ao Orquestrador:
 4. evidência de playback/waveform/corte;
 5. divergências de requisito encontradas;
 6. itens que o Experience Validator deve inspecionar.
+
+
+## Orchestrator review — correções obrigatórias antes do aceite
+
+### GAP-TIMING-01 — WaveformPane sem cobertura
+O domínio `TimingSelection` possui testes, mas o componente que converte coordenada X ↔ tempo, aplica zoom/pan e limita drag IN/OUT não possui teste dedicado.
+
+O agente deve tornar a matemática da viewport testável fora do JavaFX UI thread, extraindo-a para um componente/domínio puro (ex.: `WaveViewport`) ou equivalente.
+
+Cobertura mínima:
+- x → ms no zoom 1×;
+- x → ms com zoom;
+- pan limitado ao início/fim;
+- marcador IN não cruza OUT;
+- marcador OUT não cruza IN;
+- playhead/viewport permanece dentro da duração.
+
+### GAP-TIMING-02 — contrato MediaCut precisa de teste próprio
+Adicionar teste que prove:
+- outputPath diferente da fonte;
+- duração consistente;
+- intervalo inválido rejeitado;
+- arquivo de saída obrigatório.
+
+### GAP-TIMING-03 — evidência de pipeline empacotado
+O smoke `--timing-smoke` deve continuar passando no app-image e no aplicativo instalado.
+
+O Timing Editor permanece **IN PROGRESS** até esses gaps serem resolvidos.
