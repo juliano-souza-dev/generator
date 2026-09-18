@@ -44,6 +44,7 @@ class DesktopRuntime:
             port=self.port,
             log_level="warning",
             access_log=False,
+            log_config=None,
         )
         self._server = uvicorn.Server(config)
         self._thread = threading.Thread(
