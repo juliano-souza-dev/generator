@@ -195,29 +195,13 @@ jobs:
 
           Write-Host "Registered uninstall command: $uninstallCommand"
 
-          if ($uninstallCommand -match '^"([^"]+)"\\s*(.*)
-          if (Test-Path $installedExe) {
-            throw "Installed launcher still exists after uninstall"
-          }
-
-          if (-not (Test-Path $persistenceMarker)) {
-            throw "Uninstall removed persistent user data"
-          }
-
-          Write-Host "Installer lifecycle PASS: install, installed smoke, uninstall, persistent-data preservation"
-
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: ImmersionHub-Generator-Java-Windows
-          path: desktop/target/installer/*.exe
-          if-no-files-found: error
-          retention-days: 14
-) {
-            $uninstallExe = $Matches[1]
-            $uninstallTail = $Matches[2].Trim()
+          if ($uninstallCommand.StartsWith('"')) {
+            $closingQuote = $uninstallCommand.IndexOf('"', 1)
+            if ($closingQuote -lt 2) { throw "Invalid quoted uninstall command: $uninstallCommand" }
+            $uninstallExe = $uninstallCommand.Substring(1, $closingQuote - 1)
+            $uninstallTail = $uninstallCommand.Substring($closingQuote + 1).Trim()
           } else {
-            $parts = $uninstallCommand -split '\\s+', 2
+            $parts = $uninstallCommand -split '\s+', 2
             $uninstallExe = $parts[0]
             $uninstallTail = if ($parts.Count -gt 1) { $parts[1] } else { "" }
           }
