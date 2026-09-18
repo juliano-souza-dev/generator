@@ -37,7 +37,7 @@ def _ass_text(value: Any) -> str:
     return str(value or "").replace("\\", r"\\").replace("{", r"\{").replace("}", r"\}").replace("\n", r"\N")
 
 
-def _write_dual_scene_ass(canonical: dict[str, Any], block_start: int, block_end: int, path: Path) -> None:
+def _write_wbw_ass(canonical: dict[str, Any], block_start: int, block_end: int, path: Path) -> None:
     header = """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -74,43 +74,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     path.write_text(header + "\n".join(events) + "\n", encoding="utf-8-sig")
 
 
-def render_dual_scene_video(canonical: dict[str, Any], en_video: Path, pt_video: Path, output: Path) -> None:
-    blocks = canonical.get("dualScene") if isinstance(canonical.get("dualScene"), list) else []
-    if not blocks: raise RuntimeError("Dual Scene não contém blocos finalizados.")
-    if not en_video.is_file() or not pt_video.is_file(): raise RuntimeError("Vídeos EN/PT do Dual Scene não foram encontrados.")
-    if shutil.which("ffmpeg") is None: raise RuntimeError("FFmpeg não encontrado.")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="generator_dual_") as temp_name:
-        temp = Path(temp_name); parts: list[Path] = []; part_durations: list[float] = []
-        for index, block in enumerate(blocks, start=1):
-            en = block.get("en") if isinstance(block.get("en"), dict) else {}; pt = block.get("pt") if isinstance(block.get("pt"), dict) else {}
-            for language, source, timing in (("en", en_video, en), ("pt", pt_video, pt)):
-                start = int(timing.get("start_ms") or 0); end = int(timing.get("end_ms") or 0); duration = end - start
-                if duration <= 0: raise RuntimeError(f"Bloco {index} {language.upper()} possui duração inválida.")
-                part = temp / f"{index:03d}_{language}.mp4"
-                filters = ["scale=1080:1920:force_original_aspect_ratio=increase", "crop=1080:1920", "setsar=1", "fps=30"]
-                if language == "en":
-                    ass = temp / f"{index:03d}.ass"; _write_dual_scene_ass(canonical, start, end, ass)
-                    escaped = str(ass).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
-                    filters.append(f"subtitles='{escaped}'")
-                command = ["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",f"{start/1000:.3f}","-i",str(source),"-t",f"{duration/1000:.3f}","-vf",",".join(filters),"-af","aresample=48000","-c:v","libx264","-preset","veryfast","-crf","20","-c:a","aac","-ar","48000","-ac","2","-movflags","+faststart",str(part)]
-                completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
-                if completed.returncode: raise RuntimeError(f"Falha ao renderizar bloco {index} {language.upper()}: {completed.stderr.strip()}")
-                parts.append(part); part_durations.append(duration/1000)
-        transition=.067
-        command=["ffmpeg","-hide_banner","-loglevel","error","-y"]
-        for part in parts: command.extend(["-i",str(part)])
-        graph=[]; cumulative=part_durations[0]; video_label="0:v"; audio_label="0:a"
-        for part_index in range(1,len(parts)):
-            offset=max(0,cumulative-transition); next_video=f"v{part_index}"; next_audio=f"a{part_index}"
-            graph.append(f"[{video_label}][{part_index}:v]xfade=transition=fadefast:duration={transition:.3f}:offset={offset:.3f}[{next_video}]")
-            graph.append(f"[{audio_label}][{part_index}:a]acrossfade=d={transition:.3f}:c1=tri:c2=tri[{next_audio}]")
-            video_label=next_video; audio_label=next_audio; cumulative+=part_durations[part_index]-transition
-        command.extend(["-filter_complex",";".join(graph),"-map",f"[{video_label}]","-map",f"[{audio_label}]","-c:v","libx264","-preset","veryfast","-crf","20","-c:a","aac","-movflags","+faststart",str(output)])
-        completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if completed.returncode: raise RuntimeError(f"Falha ao unir os blocos Dual Scene: {completed.stderr.strip()}")
-
-
 def _media_duration_ms(path: Path) -> int:
     completed = subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(path)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if completed.returncode: raise RuntimeError(f"Não foi possível ler a duração de {path.name}.")
@@ -127,7 +90,7 @@ def render_music_video(canonical: dict[str, Any], source_video: Path, output: Pa
     if end<=start: raise RuntimeError("Intervalo final do Music é inválido.")
     output.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="generator_music_") as temp_name:
-        ass=Path(temp_name)/"music_wbw.ass"; _write_dual_scene_ass(canonical,start,end,ass)
+        ass=Path(temp_name)/"music_wbw.ass"; _write_wbw_ass(canonical,start,end,ass)
         escaped=str(ass).replace("\\","/").replace(":",r"\:").replace("'",r"\'")
         filters=["scale=1080:1920:force_original_aspect_ratio=increase","crop=1080:1920","setsar=1","fps=30",f"subtitles='{escaped}'"]
         command=["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",f"{start/1000:.3f}","-i",str(source_video),"-t",f"{(end-start)/1000:.3f}","-vf",",".join(filters),"-af","aresample=48000","-c:v","libx264","-preset","veryfast","-crf","20","-c:a","aac","-ar","48000","-ac","2","-movflags","+faststart",str(output)]
@@ -714,8 +677,6 @@ def build_hub_final_json(
     }
     result["shadowingConfig"] = copy.deepcopy(canonical.get("shadowingConfig") or {})
     result["shadowingPractice"] = copy.deepcopy(shadowing_plan or {})
-    if content_type != "music" and canonical.get("dualScene"):
-        result["dualScene"] = copy.deepcopy(canonical.get("dualScene"))
     if content_type == "music":
         if canonical.get("music"):
             result["music"] = copy.deepcopy(canonical.get("music"))
@@ -801,12 +762,7 @@ def _validate_hub_final_json(payload: dict[str, Any]) -> None:
                 previous_word_start = word_start
         seen.add(order)
     practice = payload.get("shadowingPractice")
-    dual_scene = payload.get("dualScene") if isinstance(payload.get("dualScene"), list) else []
-    if dual_scene:
-        for position, block in enumerate(dual_scene, start=1):
-            if not isinstance(block, dict) or not isinstance(block.get("en"), dict) or not isinstance(block.get("pt"), dict):
-                raise RuntimeError(f"JSON final do HUB: bloco Dual Scene {position} inválido.")
-    elif not isinstance(practice, dict) or practice.get("enabled") is not True or not isinstance(practice.get("blocks"), list):
+    if not isinstance(practice, dict) or practice.get("enabled") is not True or not isinstance(practice.get("blocks"), list):
         raise RuntimeError("JSON final do HUB sem shadowingPractice aprovado.")
     if str(kit.get("contentType") or "") == "music":
         music = payload.get("music") if isinstance(payload.get("music"), dict) else {}
@@ -840,8 +796,6 @@ def generate_final_materials(
     tts_voice_dirs: dict[str, Path] | None = None,
     output_dir: Path,
     source_title: str,
-    dual_scene_en_video: Path | None = None,
-    dual_scene_pt_video: Path | None = None,
     music_source_video: Path | None = None,
     shadowing_source_video: Path | None = None,
     progress: Progress | None = None,
@@ -959,17 +913,6 @@ def generate_final_materials(
                 shadowing_video.unlink(missing_ok=True)
                 fail("shadowing.video", "videoShadowing.mp4", exc)
         remember_artifact("mp4", "shadowing_video", shadowing_video)
-
-    dual_video = output_dir / "videoDualScene.mp4"
-    if canonical.get("dualScene"):
-        if wants("dual_scene.video"):
-            try:
-                emit(89, "Gerando videoDualScene: EN com WbW → PT sem legenda…")
-                render_dual_scene_video(canonical, Path(dual_scene_en_video or ""), Path(dual_scene_pt_video or ""), dual_video)
-            except Exception as exc:
-                dual_video.unlink(missing_ok=True)
-                fail("dual_scene.video", "videoDualScene.mp4", exc)
-        remember_artifact("mp4", "dual_scene", dual_video)
 
     music_video = output_dir / "videoMusic.mp4"
     content_type = str(((canonical.get("project") or {}).get("content_type") or ""))
