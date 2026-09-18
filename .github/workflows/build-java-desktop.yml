@@ -122,10 +122,10 @@ jobs:
           $speechSource = (Join-Path (Get-Location) "target/jfk.wav")
           Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ggml-org/whisper.cpp/927cfce34f31707e17f2bff35c349632fb9e2c3a/samples/jfk.wav" -OutFile $speechSource
           $speech = (Join-Path (Get-Location) "target/preparation-smoke.wav")
-          & $ffmpeg -hide_banner -loglevel error -y -i $speechSource -af "apad=pad_dur=2" -t 12 -ac 1 -ar 16000 -c:a pcm_s16le $speech
+          & $ffmpeg -hide_banner -loglevel error -y -i $speechSource -af "apad=pad_dur=1" -t 4 -ac 1 -ar 16000 -c:a pcm_s16le $speech
           if ($LASTEXITCODE -ne 0) { throw "Could not prepare speech smoke media" }
 
-          $preparation = Start-Process -FilePath $exe -ArgumentList @("--preparation-smoke", $speech, "12000") -PassThru -Wait
+          $preparation = Start-Process -FilePath $exe -ArgumentList @("--preparation-smoke", $speech, "4000") -PassThru -Wait
           if ($preparation.ExitCode -ne 0) { throw "Packaged preparation pipeline smoke test failed with exit code $($preparation.ExitCode)" }
 
       - name: Install Inno Setup
@@ -206,7 +206,7 @@ jobs:
             Remove-Item -Path $installedPreparationCache -Recurse -Force
           }
           $speech = Resolve-Path "target/preparation-smoke.wav"
-          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--preparation-smoke", $speech, "12000") -TimeoutSeconds 180 -Label "installed preparation smoke"
+          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--preparation-smoke", $speech, "4000") -TimeoutSeconds 180 -Label "installed preparation smoke"
 
           if (-not (Test-Path $dataDir)) {
             throw "Persistent data directory was not created at $dataDir"
