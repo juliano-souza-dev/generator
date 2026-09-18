@@ -41,8 +41,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          rm -rf target/package target/jre-extract target/ffmpeg-extract
-          mkdir -p target/package/app/lib target/package/app/tools/ffmpeg target/package/runtime target/installer
+          rm -rf target/package target/jre-extract target/ffmpeg-extract target/whisper-extract
+          mkdir -p target/package/app/lib target/package/app/tools/ffmpeg target/package/app/tools/whisper/models target/package/runtime target/installer
 
           cp target/generator-desktop-0.1.0-test.jar target/package/app/generator-desktop.jar
 
@@ -86,10 +86,29 @@ jobs:
           test -x "$FFMPEG_ROOT/bin/ffmpeg.exe"
           cp -a "$FFMPEG_ROOT"/bin/. target/package/app/tools/ffmpeg/
 
+          curl -L --fail --retry 3 \
+            "https://github.com/ggml-org/whisper.cpp/releases/download/b5130/whisper-bin-x64.zip" \
+            -o target/whisper.zip
+          echo "f9ec6c52a2e949b62ab51fa21d0d497958f9e41c3010c157c4e42932d5316f3c  target/whisper.zip" | sha256sum -c -
+
+          mkdir -p target/whisper-extract
+          unzip -q target/whisper.zip -d target/whisper-extract
+          WHISPER_CLI="$(find target/whisper-extract -type f -name 'whisper-cli.exe' | head -n 1)"
+          test -n "$WHISPER_CLI"
+          WHISPER_DIR="$(dirname "$WHISPER_CLI")"
+          cp -a "$WHISPER_DIR"/. target/package/app/tools/whisper/
+
+          curl -L --fail --retry 3 \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin?download=true" \
+            -o target/package/app/tools/whisper/models/ggml-base.en.bin
+          echo "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  target/package/app/tools/whisper/models/ggml-base.en.bin" | sha256sum -c -
+
           test -f target/package/runtime/bin/javaw.exe
           test -f target/package/app/generator-desktop.jar
           test -f target/package/app/tools/yt-dlp.exe
           test -f target/package/app/tools/ffmpeg/ffmpeg.exe
+          test -f target/package/app/tools/whisper/whisper-cli.exe
+          test -f target/package/app/tools/whisper/models/ggml-base.en.bin
 
       - name: Install NSIS
         shell: bash

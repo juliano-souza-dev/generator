@@ -62,6 +62,27 @@ jobs:
           New-Item -ItemType Directory -Force -Path "target/app/tools/ffmpeg" | Out-Null
           Copy-Item -Path (Join-Path $ffmpegRoot.FullName "bin\*") -Destination "target/app/tools/ffmpeg" -Recurse -Force
 
+          $whisperUrl = "https://github.com/ggml-org/whisper.cpp/releases/download/b5130/whisper-bin-x64.zip"
+          $whisperZip = "target/whisper.zip"
+          Invoke-WebRequest -Uri $whisperUrl -OutFile $whisperZip
+          $whisperExpected = "f9ec6c52a2e949b62ab51fa21d0d497958f9e41c3010c157c4e42932d5316f3c"
+          $whisperActual = (Get-FileHash -Path $whisperZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($whisperActual -ne $whisperExpected) { throw "Bundled transcription tool checksum mismatch" }
+
+          $whisperExtract = "target/whisper-extract"
+          Expand-Archive -Path $whisperZip -DestinationPath $whisperExtract -Force
+          $whisperCli = Get-ChildItem -Path $whisperExtract -Recurse -Filter "whisper-cli.exe" | Select-Object -First 1
+          if (-not $whisperCli) { throw "whisper-cli.exe not found in release archive" }
+          New-Item -ItemType Directory -Force -Path "target/app/tools/whisper" | Out-Null
+          Copy-Item -Path (Join-Path $whisperCli.Directory.FullName "*") -Destination "target/app/tools/whisper" -Recurse -Force
+
+          New-Item -ItemType Directory -Force -Path "target/app/tools/whisper/models" | Out-Null
+          $whisperModel = "target/app/tools/whisper/models/ggml-base.en.bin"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin?download=true" -OutFile $whisperModel
+          $modelExpected = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
+          $modelActual = (Get-FileHash -Path $whisperModel -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($modelActual -ne $modelExpected) { throw "Bundled transcription model checksum mismatch" }
+
       - name: Build self-contained app image
         shell: pwsh
         run: jpackage --type app-image --name "ImmersionHub Generator" --dest target/app-image --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub"
@@ -77,6 +98,16 @@ jobs:
           $ytdlpProcess = Start-Process -FilePath $ytdlp -ArgumentList "--version" -PassThru -Wait
           if ($ytdlpProcess.ExitCode -ne 0) { throw "Bundled source tool smoke test failed" }
 
+          $whisper = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/whisper/whisper-cli.exe"
+          $whisperProcess = Start-Process -FilePath $whisper -ArgumentList "--version" -PassThru -Wait
+          if ($whisperProcess.ExitCode -ne 0) { throw "Bundled transcription tool smoke test failed" }
+
+          $whisperModel = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/whisper/models/ggml-base.en.bin"
+          $modelActual = (Get-FileHash -Path $whisperModel -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($modelActual -ne "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002") {
+            throw "Packaged transcription model checksum mismatch"
+          }
+
           $ffmpeg = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/ffmpeg/ffmpeg.exe"
           & $ffmpeg -hide_banner -loglevel error -version
           if ($LASTEXITCODE -ne 0) { throw "Bundled media tool smoke test failed" }
@@ -87,6 +118,63 @@ jobs:
 
           $timing = Start-Process -FilePath $exe -ArgumentList @("--timing-smoke", $sample) -PassThru -Wait
           if ($timing.ExitCode -ne 0) { throw "Packaged timing pipeline smoke test failed with exit code $($timing.ExitCode)" }
+
+          $speechSource = (Join-Path (Get-Location) "target/jfk.wav")
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ggml-org/whisper.cpp/927cfce34f31707e17f2bff35c349632fb9e2c3a/samples/jfk.wav" -OutFile $speechSource
+          $speech = (Join-Path (Get-Location) "target/preparation-smoke.wav")
+          & $ffmpeg -hide_banner -loglevel error -y -i $speechSource -t 2 -ac 1 -ar 16000 -c:a pcm_s16le $speech
+          if ($LASTEXITCODE -ne 0) { throw "Could not prepare speech smoke media" }
+
+          $whisperSmokePrefix = (Join-Path (Get-Location) "target/whisper-smoke")
+          $whisperStart = [System.Diagnostics.ProcessStartInfo]::new()
+          $whisperStart.FileName = [string]$whisper
+          $whisperStart.UseShellExecute = $false
+          foreach ($argument in @(
+            "-m", [string]$whisperModel,
+            "-f", [string]$speech,
+            "-l", "en",
+            "-ng",
+            "-dtw", "base.en",
+            "-nfa",
+            "-ojf",
+            "-of", [string]$whisperSmokePrefix
+          )) {
+            [void]$whisperStart.ArgumentList.Add($argument)
+          }
+          $whisperSmoke = [System.Diagnostics.Process]::Start($whisperStart)
+          if (-not $whisperSmoke.WaitForExit(120000)) {
+            try { $whisperSmoke.Kill($true) } catch {}
+            throw "Bundled ASR/alignment smoke timed out"
+          }
+          $whisperSmoke.Refresh()
+          if ($whisperSmoke.ExitCode -ne 0) { throw "Bundled ASR/alignment smoke failed with exit code $($whisperSmoke.ExitCode)" }
+
+          $whisperJson = "$whisperSmokePrefix.json"
+          if (-not (Test-Path $whisperJson)) { throw "Bundled ASR/alignment smoke did not produce JSON" }
+          $whisperResult = Get-Content $whisperJson -Raw | ConvertFrom-Json
+          $segments = @($whisperResult.transcription)
+          if ($segments.Count -lt 1) { throw "Bundled ASR smoke produced no transcription segments" }
+          $spokenText = (($segments | ForEach-Object { [string]$_.text }) -join " ").Trim()
+          if ([string]::IsNullOrWhiteSpace($spokenText)) { throw "Bundled ASR smoke produced empty transcription" }
+
+          $validDtwTokens = @(
+            $segments |
+              ForEach-Object { @($_.tokens) } |
+              Where-Object {
+                $_ -and
+                ([string]$_.text) -notmatch '^\[_' -and
+                [double]$_.t_dtw -ge 0
+              }
+          )
+          if ($validDtwTokens.Count -lt 1) { throw "Bundled alignment smoke produced no DTW token anchors" }
+
+          foreach ($segment in $segments) {
+            $from = [long]$segment.offsets.from
+            $to = [long]$segment.offsets.to
+            if ($from -lt 0 -or $to -le $from -or $to -gt 2000) {
+              throw "Bundled ASR/alignment smoke produced timing outside media duration"
+            }
+          }
 
       - name: Install Inno Setup
         shell: pwsh
@@ -160,6 +248,13 @@ jobs:
 
           $sample = Resolve-Path "target/timing-smoke-source.mp4"
           Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--timing-smoke", $sample) -TimeoutSeconds 120 -Label "installed timing smoke"
+
+          $installedWhisper = Join-Path $installDir "app\tools\whisper\whisper-cli.exe"
+          $installedWhisperModel = Join-Path $installDir "app\tools\whisper\models\ggml-base.en.bin"
+          if (-not (Test-Path $installedWhisper) -or -not (Test-Path $installedWhisperModel)) {
+            throw "Installed transcription runtime/model is missing"
+          }
+          Invoke-BoundedProcess -FilePath $installedWhisper -Arguments @("--version") -TimeoutSeconds 30 -Label "installed transcription runtime smoke"
 
           if (-not (Test-Path $dataDir)) {
             throw "Persistent data directory was not created at $dataDir"
