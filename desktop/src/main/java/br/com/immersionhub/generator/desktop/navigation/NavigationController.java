@@ -1,8 +1,12 @@
 package br.com.immersionhub.generator.desktop.navigation;
 
+import br.com.immersionhub.generator.desktop.model.MediaCut;
 import br.com.immersionhub.generator.desktop.model.SourceMedia;
 import br.com.immersionhub.generator.desktop.source.SourceAcquisitionService;
 import br.com.immersionhub.generator.desktop.source.SourceModule;
+import br.com.immersionhub.generator.desktop.timing.MediaCutRepository;
+import br.com.immersionhub.generator.desktop.timing.MediaProcessor;
+import br.com.immersionhub.generator.desktop.timing.TimingModule;
 import br.com.immersionhub.generator.desktop.ui.AppShell;
 import br.com.immersionhub.generator.desktop.ui.SourceView;
 import br.com.immersionhub.generator.desktop.ui.WaveView;
@@ -13,7 +17,10 @@ public final class NavigationController {
     private final NavigationState state = new NavigationState();
     private final AppShell shell = new AppShell();
     private final SourceAcquisitionService sourceService = SourceModule.createService();
+    private final MediaProcessor mediaProcessor = TimingModule.createProcessor();
+    private final MediaCutRepository mediaCutRepository = TimingModule.createRepository();
     private SourceMedia sourceMedia;
+    private MediaCut mediaCut;
 
     public NavigationController() {
         state.onChanged(this::render);
@@ -33,6 +40,9 @@ public final class NavigationController {
     }
 
     private void acceptSource(SourceMedia media) {
+        if (sourceMedia == null || !sourceMedia.sourceId().equals(media.sourceId())) {
+            mediaCut = null;
+        }
         sourceMedia = media;
         shell.setWaveEnabled(true);
         state.navigate(ScreenId.WAVE);
@@ -40,7 +50,12 @@ public final class NavigationController {
 
     private void invalidateSource() {
         sourceMedia = null;
+        mediaCut = null;
         shell.setWaveEnabled(false);
+    }
+
+    private void acceptCut(MediaCut cut) {
+        mediaCut = cut;
     }
 
     private SourceView sourceView() {
@@ -54,7 +69,14 @@ public final class NavigationController {
                 if (sourceMedia == null) {
                     yield sourceView().root();
                 }
-                yield new WaveView(sourceMedia, () -> state.navigate(ScreenId.SOURCE)).root();
+                yield new WaveView(
+                    sourceMedia,
+                    mediaProcessor,
+                    mediaCutRepository,
+                    mediaCut,
+                    this::acceptCut,
+                    () -> state.navigate(ScreenId.SOURCE)
+                ).root();
             }
         };
         shell.show(content, sourceMedia == null && screen == ScreenId.WAVE ? ScreenId.SOURCE : screen);
