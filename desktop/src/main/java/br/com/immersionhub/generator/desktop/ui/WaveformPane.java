@@ -1,6 +1,7 @@
 package br.com.immersionhub.generator.desktop.ui;
 
 import br.com.immersionhub.generator.desktop.timing.Boundary;
+import br.com.immersionhub.generator.desktop.timing.WaveViewport;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.Region;
@@ -18,8 +19,7 @@ public final class WaveformPane extends Region {
     private long startMs = 0;
     private long endMs = 1;
     private long playheadMs = 0;
-    private double zoom = 1.0;
-    private long viewStartMs = 0;
+    private WaveViewport viewport = new WaveViewport(1);
     private Boundary dragging;
     private BiConsumer<Long, Long> rangeListener = (start, end) -> {};
     private LongConsumer seekListener = value -> {};
@@ -56,9 +56,9 @@ public final class WaveformPane extends Region {
             if (dragging == null) return;
             long value = xToMs(event.getX());
             if (dragging == Boundary.IN) {
-                startMs = Math.max(0, Math.min(value, endMs - 1));
+                startMs = viewport.clampIn(value, endMs);
             } else {
-                endMs = Math.max(startMs + 1, Math.min(value, durationMs));
+                endMs = viewport.clampOut(value, startMs);
             }
             rangeListener.accept(startMs, endMs);
             redraw();
@@ -67,11 +67,8 @@ public final class WaveformPane extends Region {
         setOnMouseReleased(event -> dragging = null);
 
         setOnScroll(event -> {
-            if (zoom <= 1.0) return;
-            long visible = visibleDurationMs();
-            long maxStart = Math.max(0, durationMs - visible);
-            long delta = Math.round(visible * 0.12 * Math.signum(event.getDeltaY()));
-            viewStartMs = clamp(viewStartMs - delta, 0, maxStart);
+            if (viewport.zoom() <= 1.0) return;
+            viewport.panByFraction(-0.12 * Math.signum(event.getDeltaY()));
             redraw();
             event.consume();
         });
@@ -80,6 +77,7 @@ public final class WaveformPane extends Region {
     public void setWaveform(List<Double> waveform, long durationMs) {
         this.waveform = waveform == null ? List.of() : List.copyOf(waveform);
         this.durationMs = Math.max(1, durationMs);
+        this.viewport = new WaveViewport(this.durationMs);
         this.endMs = Math.min(this.endMs, this.durationMs);
         redraw();
     }
@@ -97,9 +95,7 @@ public final class WaveformPane extends Region {
     }
 
     public void setZoom(double zoom) {
-        this.zoom = Math.max(1.0, Math.min(8.0, zoom));
-        long visible = visibleDurationMs();
-        viewStartMs = clamp(playheadMs - visible / 2, 0, Math.max(0, durationMs - visible));
+        viewport.setZoom(zoom, playheadMs);
         redraw();
     }
 
@@ -132,7 +128,8 @@ public final class WaveformPane extends Region {
         gc.setFill(Color.web("#10151d"));
         gc.fillRect(0, 0, width, height);
 
-        long viewEnd = viewStartMs + visibleDurationMs();
+        long viewStartMs = viewport.viewStartMs();
+        long viewEnd = viewport.viewEndMs();
         if (!waveform.isEmpty()) {
             int first = (int) Math.floor((viewStartMs / (double) durationMs) * waveform.size());
             int last = (int) Math.ceil((viewEnd / (double) durationMs) * waveform.size());
@@ -172,24 +169,15 @@ public final class WaveformPane extends Region {
     }
 
     private double msToX(long ms) {
-        long visible = visibleDurationMs();
-        return ((ms - viewStartMs) / (double) visible) * Math.max(1, getWidth());
+        return viewport.msToX(ms, getWidth());
     }
 
     private long xToMs(double x) {
-        double ratio = Math.max(0.0, Math.min(1.0, x / Math.max(1, getWidth())));
-        return clamp(viewStartMs + Math.round(ratio * visibleDurationMs()), 0, durationMs);
-    }
-
-    private long visibleDurationMs() {
-        return Math.max(1, Math.round(durationMs / zoom));
+        return viewport.xToMs(x, getWidth());
     }
 
     private void keepPlayheadVisible() {
-        long visible = visibleDurationMs();
-        if (playheadMs < viewStartMs) viewStartMs = playheadMs;
-        if (playheadMs > viewStartMs + visible) viewStartMs = playheadMs - visible;
-        viewStartMs = clamp(viewStartMs, 0, Math.max(0, durationMs - visible));
+        viewport.keepVisible(playheadMs);
     }
 
     private static long clamp(long value, long min, long max) {
