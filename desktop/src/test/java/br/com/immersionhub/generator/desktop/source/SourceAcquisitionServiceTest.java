@@ -18,9 +18,11 @@ class SourceAcquisitionServiceTest {
     @Test
     void downloadsOnceThenReusesCache(@TempDir Path tempDir) throws Exception {
         AtomicInteger downloads = new AtomicInteger();
+        AtomicInteger inspections = new AtomicInteger();
         SourceDownloader downloader = new SourceDownloader() {
             @Override
             public SourceDescriptor inspect(String canonicalUrl) {
+                inspections.incrementAndGet();
                 return new SourceDescriptor("YuUeNsZgmyc", "Cena de teste", 30_000);
             }
 
@@ -46,6 +48,7 @@ class SourceAcquisitionServiceTest {
 
         assertFalse(first.cacheHit());
         assertTrue(second.cacheHit());
+        assertEquals(1, inspections.get());
         assertEquals(1, downloads.get());
         assertEquals(first.localPath(), second.localPath());
         assertTrue(Files.isRegularFile(second.localPath()));
