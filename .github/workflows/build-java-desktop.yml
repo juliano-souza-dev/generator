@@ -126,15 +126,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not prepare speech smoke media" }
 
           $whisperSmokePrefix = (Join-Path (Get-Location) "target/whisper-smoke")
-          $whisperSmoke = Start-Process -FilePath $whisper -ArgumentList @(
-            "-m", $whisperModel,
-            "-f", $speech,
+          $whisperStart = [System.Diagnostics.ProcessStartInfo]::new()
+          $whisperStart.FileName = [string]$whisper
+          $whisperStart.UseShellExecute = $false
+          foreach ($argument in @(
+            "-m", [string]$whisperModel,
+            "-f", [string]$speech,
             "-l", "en",
             "-ng",
             "-dtw", "base.en",
             "-ojf",
-            "-of", $whisperSmokePrefix
-          ) -PassThru
+            "-of", [string]$whisperSmokePrefix
+          )) {
+            [void]$whisperStart.ArgumentList.Add($argument)
+          }
+          $whisperSmoke = [System.Diagnostics.Process]::Start($whisperStart)
           if (-not $whisperSmoke.WaitForExit(120000)) {
             try { $whisperSmoke.Kill($true) } catch {}
             throw "Bundled ASR/alignment smoke timed out"
