@@ -52,13 +52,7 @@ public final class WhisperDtwWordAligner implements WordAligner {
         // VAD não é habilitado nesta passagem: o alinhamento deve permanecer na timeline
         // original do MediaCut. O DTW fornece âncoras acústicas por token.
         Process process = new ProcessBuilder(
-            executable.get().toString(),
-            "-m", model.toString(),
-            "-f", technicalAudio.toString(),
-            "-l", "en",
-            "-dtw", dtwPreset,
-            "-ojf",
-            "-of", prefix.toString()
+            command(executable.get(), model, technicalAudio, prefix, dtwPreset)
         ).redirectErrorStream(true).start();
 
         String log;
@@ -72,6 +66,25 @@ public final class WhisperDtwWordAligner implements WordAligner {
 
         List<TimedText> candidates = parseDtwWords(json, durationMs);
         return preserveTranscript(transcription.text(), candidates);
+    }
+
+    static List<String> command(
+        Path executable,
+        Path model,
+        Path technicalAudio,
+        Path prefix,
+        String dtwPreset
+    ) {
+        return List.of(
+            executable.toString(),
+            "-m", model.toString(),
+            "-f", technicalAudio.toString(),
+            "-l", "en",
+            "-dtw", dtwPreset,
+            "-nfa",
+            "-ojf",
+            "-of", prefix.toString()
+        );
     }
 
     List<TimedText> parseDtwWords(Path json, long durationMs) throws Exception {
