@@ -3,8 +3,8 @@
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 datas = [
-    ("static", "static"),
-    ("templates", "templates"),
+    ("../static", "static"),
+    ("../templates", "templates"),
 ]
 binaries = []
 hiddenimports = [
@@ -25,8 +25,8 @@ for package in ("webview", "yt_dlp", "faster_whisper", "ctranslate2", "av"):
         hiddenimports += collect_submodules(package)
 
 a = Analysis(
-    ["desktop/main.py"],
-    pathex=["."],
+    ["main.py"],
+    pathex=[".."],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
