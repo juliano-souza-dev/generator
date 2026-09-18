@@ -5,6 +5,9 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+from pydantic import ValidationError
+
 import app
 from fastapi import BackgroundTasks
 from final_project_import import decode_final_project, install_final_project
@@ -58,23 +61,35 @@ def test_legacy_cut_and_timeline_are_inferred_without_prompt():
     assert canonical['cues'][0]['speech_start_ms'] == 7360
 
 
-def test_switch_to_dual_preserves_review_state():
+def test_reconfigure_same_kit_preserves_review_state():
     state = app._default_state()
-    state['configuration'].update(configured=True,content_type='kit',transcription_mode='external')
-    for role in ('en','pt'):
-        state[role].update(validated=True,embeddable=True,url='https://youtu.be/IBGVO0TiGjc')
-    state['word_timing'].update(completed=True,accepted_keys=['1:0'])
-    state['cue_review'].update(completed=True,accepted_orders=[1])
+    state['configuration'].update(configured=True, content_type='kit', transcription_mode='external')
+    state['en'].update(validated=True, embeddable=True, url='https://youtu.be/IBGVO0TiGjc')
+    state['word_timing'].update(completed=True, accepted_keys=['1:0'])
+    state['cue_review'].update(completed=True, accepted_orders=[1])
     expected = copy.deepcopy(state['word_timing'])
+
     def update(fn):
         fn(state)
         return state
+
     with TemporaryDirectory() as temp:
-        canonical = Path(temp)/'canonical.json'
+        canonical = Path(temp) / 'canonical.json'
         canonical.write_text('{}')
-        with patch.object(app,'_read_state',return_value=state), patch.object(app,'_update_state',side_effect=update), patch.object(app,'WORD_TIMING_CANONICAL_FILE',canonical), patch.object(app.shutil,'rmtree') as delete:
-            result = app.configure(app.ConfigureRequest(content_type='kit',transcription_mode='external'),BackgroundTasks())
-            assert result['next_url'] == '/process'
+        with patch.object(app, '_read_state', return_value=state), patch.object(app, '_update_state', side_effect=update), patch.object(app, 'WORD_TIMING_CANONICAL_FILE', canonical), patch.object(app.shutil, 'rmtree') as delete:
+            result = app.configure(app.ConfigureRequest(content_type='kit', transcription_mode='external'), BackgroundTasks())
+            assert result['next_url'] == '/shadowing'
             assert state['word_timing'] == expected
             delete.assert_not_called()
-            assert state['media_refresh_preserve_reviews'] is True
+
+
+def test_config_rejects_removed_dual_scene_field():
+    with pytest.raises(ValidationError):
+        app.ConfigureRequest(content_type='kit', transcription_mode='external', dual_scene=True)
+
+
+def test_dual_scene_routes_are_absent():
+    paths = {route.path for route in app.app.routes}
+    assert '/dual-scene' not in paths
+    assert not any(path.startswith('/api/dual-scene/') for path in paths)
+
