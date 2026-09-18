@@ -1,7 +1,12 @@
 # Handoff 003 — Issue #12 → Timing Editor Agent
 
 ## Status
-BLOQUEADO — só pode ser liberado após aceite formal do Source Ingestion & Cache Agent.
+READY — liberado pelo Orquestrador após aceite do Source Ingestion & Cache Agent.
+
+## Dependência aceita
+Source Agent aprovado no GitHub Actions run `35366298728`.
+
+O Timing Editor recebe um `SourceMedia` já local, válido e persistido. Nenhum download de Source é permitido nesta etapa.
 
 ## Issue
 #12
