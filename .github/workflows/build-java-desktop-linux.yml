@@ -1,0 +1,116 @@
+name: Build Windows Installer on Linux
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/build-java-desktop-linux.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: java-desktop-linux-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-installer-crossbuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: desktop/pom.xml
+
+      - name: Build and test Java application
+        run: mvn -B clean test package
+
+      - name: Assemble Windows Java application
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf target/package target/jre-extract target/ffmpeg-extract
+          mkdir -p target/package/app/lib target/package/app/tools/ffmpeg target/package/runtime target/installer
+
+          cp target/generator-desktop-0.1.0-test.jar target/package/app/generator-desktop.jar
+
+          mvn -B dependency:copy-dependencies \
+            -DincludeScope=runtime \
+            -DoutputDirectory=target/package/app/lib
+
+          rm -f target/package/app/lib/*-linux.jar
+          rm -f target/package/app/lib/*-mac.jar
+          rm -f target/package/app/lib/*-mac-aarch64.jar
+
+          for artifact in javafx-base javafx-graphics javafx-controls javafx-media; do
+            mvn -B dependency:copy \
+              -Dartifact=org.openjfx:${artifact}:21.0.11:jar:win \
+              -DoutputDirectory=target/package/app/lib
+          done
+
+          curl -L --fail --retry 3 \
+            "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse" \
+            -o target/windows-jre.zip
+
+          mkdir -p target/jre-extract
+          unzip -q target/windows-jre.zip -d target/jre-extract
+          JRE_ROOT="$(find target/jre-extract -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -n "$JRE_ROOT"
+          cp -a "$JRE_ROOT"/. target/package/runtime/
+
+          curl -L --fail --retry 3 \
+            "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe" \
+            -o target/package/app/tools/yt-dlp.exe
+          echo "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a  target/package/app/tools/yt-dlp.exe" | sha256sum -c -
+
+          curl -L --fail --retry 3 \
+            "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2026-09-16-22-24/ffmpeg-N-126619-g8f1e6edbab-win64-gpl-shared.zip" \
+            -o target/ffmpeg.zip
+          echo "03af4e326f9904e8ec1ac405ee57b67867db3386c61f662d7e3821517d6b8e4d  target/ffmpeg.zip" | sha256sum -c -
+
+          mkdir -p target/ffmpeg-extract
+          unzip -q target/ffmpeg.zip -d target/ffmpeg-extract
+          FFMPEG_ROOT="$(find target/ffmpeg-extract -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -x "$FFMPEG_ROOT/bin/ffmpeg.exe"
+          cp -a "$FFMPEG_ROOT"/bin/. target/package/app/tools/ffmpeg/
+
+          test -f target/package/runtime/bin/javaw.exe
+          test -f target/package/app/generator-desktop.jar
+          test -f target/package/app/tools/yt-dlp.exe
+          test -f target/package/app/tools/ffmpeg/ffmpeg.exe
+
+      - name: Install NSIS
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends nsis
+
+      - name: Build Windows Setup.exe
+        shell: bash
+        run: |
+          set -euo pipefail
+          makensis windows-installer.nsi
+          test -f target/installer/ImmersionHub-Generator-Setup-0.1.0.exe
+          sha256sum target/installer/ImmersionHub-Generator-Setup-0.1.0.exe | tee target/installer/SHA256SUMS.txt
+
+      - name: Upload installer for user QA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImmersionHub-Generator-Windows-User-QA
+          path: |
+            desktop/target/installer/ImmersionHub-Generator-Setup-0.1.0.exe
+            desktop/target/installer/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
