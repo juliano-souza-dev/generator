@@ -23,7 +23,7 @@ class SourceViewMessageTest {
         );
 
         assertEquals(
-            "Não foi possível preparar essa fonte. Verifique o link e tente novamente.",
+            "Não foi possível preparar essa fonte agora. Tente novamente.",
             message
         );
         assertFalse(message.contains("extractor"));
