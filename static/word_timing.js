@@ -163,11 +163,10 @@
     if(nextButton){
       const next=state.next_stage||{};
       const shadowing=state.completed&&next.kind==='shadowing'&&next.url;
-      const dualScene=state.completed&&next.kind==='dual_scene'&&next.url;
       const materials=state.completed&&next.kind==='materials_external'&&next.url;
-      nextButton.disabled=!(shadowing||dualScene||materials);
-      nextButton.textContent=materials?'Avançar para materiais →':(dualScene?'Avançar para Dual Scene →':(shadowing?'Avançar para Shadowing →':'Próxima etapa · bloqueada'));
-      nextButton.onclick=(shadowing||dualScene||materials)?()=>{location.href=next.url}:null;
+      nextButton.disabled=!(shadowing||materials);
+      nextButton.textContent=materials?'Avançar para materiais →':(shadowing?'Avançar para Shadowing →':'Próxima etapa · bloqueada');
+      nextButton.onclick=(shadowing||materials)?()=>{location.href=next.url}:null;
     }
     if (repairMode && repairLoaded) {
       $('saveWordTiming').textContent=returnTo?'Salvar correção e voltar →':'Salvar correção';
