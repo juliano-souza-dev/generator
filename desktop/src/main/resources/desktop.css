@@ -123,3 +123,28 @@
     -fx-text-fill: #7f8b9d;
     -fx-font-size: 11px;
 }
+
+.primary-button:focused,
+.secondary-button:focused,
+.nav-button:focused,
+.source-field:focused,
+.time-field:focused,
+.waveform-pane:focused {
+    -fx-border-color: #8ab4ff;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+}
+
+.secondary-button:selected {
+    -fx-background-color: #33445f;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #8ab4ff;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+}
+
+.save-state-label {
+    -fx-text-fill: #b9c7d9;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
