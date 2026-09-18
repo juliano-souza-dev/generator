@@ -195,7 +195,7 @@ jobs:
 
           Write-Host "Registered uninstall command: $uninstallCommand"
 
-          if ($uninstallCommand -match '^"([^"]+)"\s*(.*)
+          if ($uninstallCommand -match '^"([^"]+)"\s*(.*)$') {
             $uninstallExe = $Matches[1]
             $uninstallTail = $Matches[2].Trim()
           } else {
