@@ -11,7 +11,7 @@ on:
 jobs:
   windows-installer:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     defaults:
       run:
@@ -37,30 +37,52 @@ jobs:
           Copy-Item "target/generator-desktop-0.1.0-test.jar" "target/app/generator-desktop.jar"
 
           New-Item -ItemType Directory -Force -Path "target/app/tools" | Out-Null
-          $toolUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe"
-          $toolPath = "target/app/tools/yt-dlp.exe"
-          Invoke-WebRequest -Uri $toolUrl -OutFile $toolPath
 
-          $expected = "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
-          $actual = (Get-FileHash -Path $toolPath -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $expected) {
-            throw "Bundled source tool checksum mismatch"
-          }
+          $ytdlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe"
+          $ytdlpPath = "target/app/tools/yt-dlp.exe"
+          Invoke-WebRequest -Uri $ytdlpUrl -OutFile $ytdlpPath
+          $ytdlpExpected = "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
+          $ytdlpActual = (Get-FileHash -Path $ytdlpPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($ytdlpActual -ne $ytdlpExpected) { throw "Bundled source tool checksum mismatch" }
+
+          $ffmpegUrl = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2026-09-16-22-24/ffmpeg-N-126619-g8f1e6edbab-win64-gpl-shared.zip"
+          $ffmpegZip = "target/ffmpeg.zip"
+          Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip
+          $ffmpegExpected = "03af4e326f9904e8ec1ac405ee57b67867db3386c61f662d7e3821517d6b8e4d"
+          $ffmpegActual = (Get-FileHash -Path $ffmpegZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($ffmpegActual -ne $ffmpegExpected) { throw "Bundled media tool checksum mismatch" }
+
+          $ffmpegExtract = "target/ffmpeg-extract"
+          Expand-Archive -Path $ffmpegZip -DestinationPath $ffmpegExtract -Force
+          $ffmpegRoot = Get-ChildItem -Path $ffmpegExtract -Directory | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path "target/app/tools/ffmpeg" | Out-Null
+          Copy-Item -Path (Join-Path $ffmpegRoot.FullName "bin\*") -Destination "target/app/tools/ffmpeg" -Recurse -Force
 
       - name: Build self-contained app image
         shell: pwsh
         run: jpackage --type app-image --name "ImmersionHub Generator" --dest target/app-image --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub"
 
-      - name: Smoke test bundled Java runtime
+      - name: Smoke test bundled runtime and media pipeline
         shell: pwsh
         run: |
           $exe = Resolve-Path "target/app-image/ImmersionHub Generator/ImmersionHub Generator.exe"
           $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -PassThru -Wait
           if ($process.ExitCode -ne 0) { throw "Java desktop smoke test failed with exit code $($process.ExitCode)" }
 
-          $tool = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/yt-dlp.exe"
-          $toolProcess = Start-Process -FilePath $tool -ArgumentList "--version" -PassThru -Wait
-          if ($toolProcess.ExitCode -ne 0) { throw "Bundled source tool smoke test failed" }
+          $ytdlp = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/yt-dlp.exe"
+          $ytdlpProcess = Start-Process -FilePath $ytdlp -ArgumentList "--version" -PassThru -Wait
+          if ($ytdlpProcess.ExitCode -ne 0) { throw "Bundled source tool smoke test failed" }
+
+          $ffmpeg = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/ffmpeg/ffmpeg.exe"
+          & $ffmpeg -hide_banner -loglevel error -version
+          if ($LASTEXITCODE -ne 0) { throw "Bundled media tool smoke test failed" }
+
+          $sample = (Join-Path (Get-Location) "target/timing-smoke-source.mp4")
+          & $ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc2=size=320x180:rate=30" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 2 -c:v libx264 -pix_fmt yuv420p -c:a aac $sample
+          if ($LASTEXITCODE -ne 0) { throw "Could not create timing smoke media" }
+
+          $timing = Start-Process -FilePath $exe -ArgumentList @("--timing-smoke", $sample) -PassThru -Wait
+          if ($timing.ExitCode -ne 0) { throw "Packaged timing pipeline smoke test failed with exit code $($timing.ExitCode)" }
 
       - name: Install WiX Toolset
         shell: pwsh
