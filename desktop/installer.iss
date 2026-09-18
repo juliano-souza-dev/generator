@@ -18,10 +18,16 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-CloseApplications=yes
+CloseApplications=force
+CloseApplicationsFilter=*.*
+RestartApplications=no
 UninstallDisplayName={#MyAppName}
 UsePreviousAppDir=yes
 DisableProgramGroupPage=yes
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\runtime"
+Type: filesandordirs; Name: "{app}\app"
 
 [Files]
 Source: "target\app-image\ImmersionHub Generator\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -35,3 +41,39 @@ Name: "desktopicon"; Description: "Criar atalho na área de trabalho"; GroupDesc
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Abrir {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+  RuntimeDir: String;
+  AppDir: String;
+begin
+  Result := '';
+
+  { Close only the ImmersionHub desktop process before repairing the packaged runtime. }
+  Exec(
+    ExpandConstant('{cmd}'),
+    '/C taskkill /F /IM "ImmersionHub Generator.exe" >nul 2>&1',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  Sleep(750);
+
+  RuntimeDir := ExpandConstant('{app}\runtime');
+  AppDir := ExpandConstant('{app}\app');
+
+  if DirExists(RuntimeDir) and (not DelTree(RuntimeDir, True, True, True)) then
+  begin
+    Result := 'Não foi possível atualizar o runtime do ImmersionHub. Feche o aplicativo e tente novamente.';
+    Exit;
+  end;
+
+  if DirExists(AppDir) and (not DelTree(AppDir, True, True, True)) then
+  begin
+    Result := 'Não foi possível atualizar os componentes do ImmersionHub. Feche o aplicativo e tente novamente.';
+    Exit;
+  end;
+end;

@@ -263,6 +263,88 @@ jobs:
           $persistenceMarker = Join-Path $dataDir "qa-persistence.marker"
           Set-Content -Path $persistenceMarker -Value "keep" -Encoding UTF8
 
+          Write-Host "PHASE: repair upgrade while installed app keeps Java runtime loaded"
+          $holdProcess = Start-Process -FilePath $installedExe -ArgumentList @("--installer-lock-smoke") -PassThru
+          Start-Sleep -Seconds 2
+          $holdProcess.Refresh()
+          if ($holdProcess.HasExited) {
+            throw "Installed app lock smoke exited before upgrade"
+          }
+
+          $damageTarget = Get-ChildItem -Path (Join-Path $installDir "app\tools\whisper") -Filter "*.dll" -File |
+            Select-Object -First 1
+          if (-not $damageTarget) {
+            try { $holdProcess.Kill($true) } catch {}
+            throw "Could not find a packaged DLL to simulate an incomplete previous install"
+          }
+          Remove-Item -Path $damageTarget.FullName -Force
+          if (Test-Path $damageTarget.FullName) {
+            try { $holdProcess.Kill($true) } catch {}
+            throw "Could not simulate missing packaged DLL before repair upgrade"
+          }
+
+          $upgradeLog = Join-Path (Get-Location) "target\installer-upgrade.log"
+          try {
+            Invoke-BoundedProcess -FilePath $installer.FullName -Arguments @(
+              "/VERYSILENT",
+              "/SUPPRESSMSGBOXES",
+              "/NORESTART",
+              "/CLOSEAPPLICATIONS",
+              "/FORCECLOSEAPPLICATIONS",
+              "/NORESTARTAPPLICATIONS",
+              "/LOG=$upgradeLog"
+            ) -TimeoutSeconds 180 -Label "repair upgrade"
+          } catch {
+            try {
+              $holdProcess.Refresh()
+              if (-not $holdProcess.HasExited) { $holdProcess.Kill($true) }
+            } catch {}
+            if (Test-Path $upgradeLog) {
+              Write-Host "===== upgrade installer log ====="
+              Get-Content $upgradeLog
+              Write-Host "================================="
+            }
+            throw
+          }
+
+          $holdProcess.Refresh()
+          if (-not $holdProcess.HasExited) {
+            try { $holdProcess.Kill($true) } catch {}
+            throw "Installer did not close the running ImmersionHub instance before rebuilding the runtime"
+          }
+
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed launcher is missing after in-place upgrade"
+          }
+          if (-not (Test-Path $persistenceMarker)) {
+            throw "In-place upgrade removed persistent user data"
+          }
+
+          $packagedRoot = (Resolve-Path "target/app-image/ImmersionHub Generator").Path
+          $criticalRoots = @(
+            "runtime",
+            "app\tools\whisper",
+            "app\tools\ffmpeg"
+          )
+          foreach ($relativeRoot in $criticalRoots) {
+            $sourceRoot = Join-Path $packagedRoot $relativeRoot
+            Get-ChildItem -Path $sourceRoot -File -Recurse | ForEach-Object {
+              $relativeFile = $_.FullName.Substring($packagedRoot.Length).TrimStart('\')
+              $installedFile = Join-Path $installDir $relativeFile
+              if (-not (Test-Path $installedFile)) {
+                throw "Upgrade left packaged dependency missing: $relativeFile"
+              }
+
+              $sourceLength = $_.Length
+              $installedLength = (Get-Item $installedFile).Length
+              if ($sourceLength -ne $installedLength) {
+                throw "Upgrade left packaged dependency with wrong size: $relativeFile"
+              }
+            }
+          }
+
+          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--smoke-test") -TimeoutSeconds 90 -Label "post-upgrade launcher smoke"
+
           Write-Host "PHASE: discover registered uninstaller"
           $uninstallRoots = @(
             "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
@@ -316,7 +398,7 @@ jobs:
             throw "Uninstall removed persistent user data"
           }
 
-          Write-Host "Installer lifecycle PASS: install, installed smoke, uninstall, persistent-data preservation"
+          Write-Host "Installer lifecycle PASS: install, repair upgrade, runtime completeness, installed smoke, uninstall, persistent-data preservation"
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
