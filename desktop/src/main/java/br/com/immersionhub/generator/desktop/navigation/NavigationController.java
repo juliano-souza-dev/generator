@@ -6,6 +6,7 @@ import br.com.immersionhub.generator.desktop.source.SourceAcquisitionService;
 import br.com.immersionhub.generator.desktop.source.SourceModule;
 import br.com.immersionhub.generator.desktop.timing.MediaCutRepository;
 import br.com.immersionhub.generator.desktop.timing.MediaProcessor;
+import br.com.immersionhub.generator.desktop.timing.TimingDraftRepository;
 import br.com.immersionhub.generator.desktop.timing.TimingModule;
 import br.com.immersionhub.generator.desktop.ui.AppShell;
 import br.com.immersionhub.generator.desktop.ui.SourceView;
@@ -19,6 +20,7 @@ public final class NavigationController {
     private final SourceAcquisitionService sourceService = SourceModule.createService();
     private final MediaProcessor mediaProcessor = TimingModule.createProcessor();
     private final MediaCutRepository mediaCutRepository = TimingModule.createRepository();
+    private final TimingDraftRepository timingDraftRepository = TimingModule.createDraftRepository();
     private SourceMedia sourceMedia;
     private MediaCut mediaCut;
 
@@ -73,6 +75,7 @@ public final class NavigationController {
                     sourceMedia,
                     mediaProcessor,
                     mediaCutRepository,
+                    timingDraftRepository,
                     mediaCut,
                     this::acceptCut,
                     () -> state.navigate(ScreenId.SOURCE)
