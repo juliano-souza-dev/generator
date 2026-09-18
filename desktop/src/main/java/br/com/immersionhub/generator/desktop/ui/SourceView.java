@@ -105,11 +105,7 @@ public final class SourceView {
             });
 
             task.setOnFailed(done -> {
-                Throwable failure = task.getException();
-                String message = failure == null || failure.getMessage() == null || failure.getMessage().isBlank()
-                    ? "Não foi possível preparar essa fonte."
-                    : failure.getMessage();
-                status.setText(message);
+                status.setText(userFacingSourceError(task.getException()));
                 prepare.setDisable(false);
                 url.setDisable(false);
                 progress.setVisible(false);
@@ -129,4 +125,17 @@ public final class SourceView {
     }
 
     public Parent root() { return root; }
+
+    static String userFacingSourceError(Throwable failure) {
+        if (failure instanceof IllegalArgumentException && failure.getMessage() != null) {
+            String message = failure.getMessage().trim();
+            if (message.startsWith("Informe uma URL")
+                || message.startsWith("A URL informada")
+                || message.startsWith("Use uma URL")
+                || message.startsWith("Informe o link")) {
+                return message;
+            }
+        }
+        return "Não foi possível preparar essa fonte. Verifique o link e tente novamente.";
+    }
 }
