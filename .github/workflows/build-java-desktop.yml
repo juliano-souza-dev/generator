@@ -90,7 +90,43 @@ jobs:
 
       - name: Build Windows installer
         shell: pwsh
-        run: jpackage --type exe --name "ImmersionHub Generator" --dest target/installer --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub" --description "ImmersionHub Generator Desktop" --win-per-user-install --win-menu --win-shortcut --win-dir-chooser
+        run: jpackage --type exe --name "ImmersionHub Generator" --dest target/installer --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub" --description "ImmersionHub Generator Desktop" --win-per-user-install --win-menu --win-shortcut --win-dir-chooser --install-dir "ImmersionHub Generator" --win-upgrade-uuid "4f32c0b7-2b58-4f4e-9e27-1d4b8aab5c12"
+
+      - name: Install and smoke test generated Setup
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "target/installer" -Filter "*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "Windows installer was not generated" }
+
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @("/quiet", "/norestart") -PassThru -Wait
+          if ($install.ExitCode -ne 0) {
+            throw "Windows installer failed with exit code $($install.ExitCode)"
+          }
+
+          $installedExe = Join-Path $env:LOCALAPPDATA "ImmersionHub Generator\ImmersionHub Generator.exe"
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed launcher was not found at $installedExe"
+          }
+
+          $smoke = Start-Process -FilePath $installedExe -ArgumentList "--smoke-test" -PassThru -Wait
+          if ($smoke.ExitCode -ne 0) {
+            throw "Installed launcher smoke test failed with exit code $($smoke.ExitCode)"
+          }
+
+          $sample = Resolve-Path "target/timing-smoke-source.mp4"
+          $timing = Start-Process -FilePath $installedExe -ArgumentList @("--timing-smoke", $sample) -PassThru -Wait
+          if ($timing.ExitCode -ne 0) {
+            throw "Installed timing pipeline smoke test failed with exit code $($timing.ExitCode)"
+          }
+
+          $uninstall = Start-Process -FilePath $installer.FullName -ArgumentList @("/uninstall", "/quiet", "/norestart") -PassThru -Wait
+          if ($uninstall.ExitCode -ne 0) {
+            throw "Windows uninstaller failed with exit code $($uninstall.ExitCode)"
+          }
+
+          if (Test-Path $installedExe) {
+            throw "Installed launcher still exists after uninstall"
+          }
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
