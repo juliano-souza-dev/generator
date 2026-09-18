@@ -32,7 +32,7 @@ class YtDlpSourceDownloaderTest {
                 );
             },
             sleeps::add,
-            new SourceDownloadDiagnostics(tempDir.resolve("source.log"))
+            tempDir.resolve("source.log")
         );
 
         SourceDescriptor descriptor = downloader.inspect("https://www.youtube.com/watch?v=abc123");
@@ -57,7 +57,7 @@ class YtDlpSourceDownloaderTest {
                 return new YtDlpSourceDownloader.CommandResult(1, "ERROR: Video unavailable");
             },
             millis -> sleeps.incrementAndGet(),
-            new SourceDownloadDiagnostics(tempDir.resolve("source.log"))
+            tempDir.resolve("source.log")
         );
 
         IOException failure = assertThrows(
@@ -91,7 +91,7 @@ class YtDlpSourceDownloaderTest {
                 return new YtDlpSourceDownloader.CommandResult(0, "ok");
             },
             millis -> {},
-            new SourceDownloadDiagnostics(tempDir.resolve("source.log"))
+            tempDir.resolve("source.log")
         );
 
         Path media = downloader.download("https://www.youtube.com/watch?v=abc123", tempDir.resolve("incoming"));
@@ -122,7 +122,7 @@ class YtDlpSourceDownloaderTest {
                 return new YtDlpSourceDownloader.CommandResult(0, "ok");
             },
             millis -> sleeps.incrementAndGet(),
-            new SourceDownloadDiagnostics(tempDir.resolve("source.log"))
+            tempDir.resolve("source.log")
         );
 
         Path media = downloader.download("https://www.youtube.com/watch?v=abc123", tempDir.resolve("incoming"));
