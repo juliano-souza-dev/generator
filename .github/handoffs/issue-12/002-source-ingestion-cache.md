@@ -1,7 +1,11 @@
 # Handoff 002 — Issue #12 → Source Ingestion & Cache Agent
 
 ## Status
-READY — liberado pelo Orquestrador após aceite do Handoff 001.
+CHANGES REQUESTED — revisão do Orquestrador encontrou gate incorreto ao editar uma URL já preparada.
+
+### Correção exigida
+- alterar a URL invalida imediatamente a fonte pronta e bloqueia Wave;
+- falha de download deve ter teste explícito provando ausência de cache falso-positivo.
 
 ## Issue ativa
 #12 — Converter o Generator em aplicativo desktop instalável
