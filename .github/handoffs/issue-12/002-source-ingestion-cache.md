@@ -1,11 +1,20 @@
 # Handoff 002 — Issue #12 → Source Ingestion & Cache Agent
 
 ## Status
-CHANGES REQUESTED — revisão do Orquestrador encontrou gate incorreto ao editar uma URL já preparada.
+ACCEPTED — entrega aprovada pelo Orquestrador após correção do gate de URL e novo CI verde.
 
-### Correção exigida
-- alterar a URL invalida imediatamente a fonte pronta e bloqueia Wave;
-- falha de download deve ter teste explícito provando ausência de cache falso-positivo.
+## Evidências de aceite
+- cache miss → download/persistência coberto por teste;
+- cache hit → zero novo download coberto por teste;
+- URLs equivalentes convergem para a mesma URL canônica;
+- metadado corrompido é ignorado com segurança;
+- mídia ausente força nova aquisição;
+- falha de download não cria cache falso-positivo;
+- edição da URL invalida a fonte pronta e bloqueia Wave;
+- `SourceMedia` é entregue ao consumidor;
+- downloader fica atrás de interface testável;
+- instalador empacota o downloader com checksum verificado;
+- GitHub Actions run `35366298728` concluiu com sucesso.
 
 ## Issue ativa
 #12 — Converter o Generator em aplicativo desktop instalável
@@ -116,18 +125,18 @@ SourceCacheRepository
 O agente escolhe nomes finais, mas não pode acoplar UI diretamente a yt-dlp/processo externo.
 
 ## Critérios de aceite
-- [ ] cache miss → download + persistência;
-- [ ] cache hit → zero novo download;
-- [ ] URL canônica equivalente reutiliza cache;
-- [ ] URL inválida não libera avanço;
-- [ ] metadado existe mas arquivo sumiu → entrada tratada como inválida;
-- [ ] arquivo existe mas metadado está corrompido → recuperação segura;
-- [ ] download com falha não deixa cache falso-positivo;
-- [ ] SourceView apresenta progresso/resultado em linguagem de produto;
-- [ ] avanço para Wave só com `SourceMedia` válido;
-- [ ] nenhuma Stage adicional é criada;
-- [ ] testes automatizados passam;
-- [ ] saída e riscos devolvidos ao Orquestrador.
+- [x] cache miss → download + persistência;
+- [x] cache hit → zero novo download;
+- [x] URL canônica equivalente reutiliza cache;
+- [x] URL inválida não libera avanço;
+- [x] metadado existe mas arquivo sumiu → entrada tratada como inválida;
+- [x] arquivo existe mas metadado está corrompido → recuperação segura;
+- [x] download com falha não deixa cache falso-positivo;
+- [x] SourceView apresenta progresso/resultado em linguagem de produto;
+- [x] avanço para Wave só com `SourceMedia` válido;
+- [x] nenhuma Stage adicional é criada;
+- [x] testes automatizados passam;
+- [x] saída e riscos devolvidos ao Orquestrador.
 
 ## Fora de escopo
 - waveform;
