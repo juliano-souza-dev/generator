@@ -20,6 +20,18 @@ public final class BundledTools {
         );
     }
 
+    public static Path whisper() {
+        return resolve(
+            "ihub.whisper.path",
+            Path.of("whisper", "whisper-cli.exe").toString(),
+            List.of(
+                Path.of("tools", "whisper", "whisper-cli.exe"),
+                Path.of("target", "app", "tools", "whisper", "whisper-cli.exe")
+            ),
+            "O componente de transcrição não foi encontrado."
+        );
+    }
+
     public static Path ffmpeg() {
         return resolve(
             "ihub.ffmpeg.path",
