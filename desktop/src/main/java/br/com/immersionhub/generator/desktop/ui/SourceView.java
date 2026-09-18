@@ -136,6 +136,6 @@ public final class SourceView {
                 return message;
             }
         }
-        return "Não foi possível preparar essa fonte. Verifique o link e tente novamente.";
+        return "Não foi possível preparar essa fonte agora. Tente novamente.";
     }
 }
