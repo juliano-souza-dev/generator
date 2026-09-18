@@ -1,22 +1,7 @@
 # Handoff 003 — Issue #12 → Timing Editor Agent
 
 ## Status
-ACCEPTED — aprovado pelo Orquestrador após implementação, revisão de contrato e CI final verde.
-
-## Evidência de aceite
-GitHub Actions run `35367416279`:
-- Maven/tests: success;
-- app-image autocontida: success;
-- smoke do runtime: success;
-- FFmpeg empacotado: success;
-- waveform real em mídia sintética: success;
-- recorte real em mídia sintética: success;
-- instalador Windows: success.
-
-## Dependência aceita
-Source Agent aprovado no GitHub Actions run `35366298728`.
-
-O Timing Editor recebe um `SourceMedia` já local, válido e persistido. Nenhum download de Source é permitido nesta etapa.
+BLOQUEADO até o Orquestrador aceitar formalmente o Source Ingestion & Cache Agent.
 
 ## Issue
 #12
@@ -24,62 +9,111 @@ O Timing Editor recebe um `SourceMedia` já local, válido e persistido. Nenhum 
 ## Branch prevista
 `feat/java-desktop-restart`
 
-## Entrada congelada
-`SourceMedia`, definido em `.github/contracts/source-media.md`.
+## Agente owner
+Timing Editor Agent
 
-O Wave recebe mídia local. Ele não baixa novamente a URL e não modifica o arquivo original no Source Cache.
+## Entrada esperada
+Contrato congelado:
+`.github/contracts/source-media.md`
 
-## Referência funcional coletada pelo Orquestrador
-O Wave legado possuía:
-- vídeo + waveform;
-- seletores IN/OUT arrastáveis;
-- playhead;
-- edição textual de IN/OUT;
-- reprodução da seleção;
-- duração;
-- atalhos Space, A, S e nudges;
-- zoom/pan no componente global.
+O agente receberá uma instância SourceMedia contendo:
+- sourceId;
+- canonicalUrl;
+- localPath;
+- title;
+- durationMs;
+- fetchedAt;
+- cacheHit.
 
-O README atual registra:
-- IN/OUT sempre visíveis;
-- `Space` play/pause;
-- `A` IN;
-- `S` OUT;
-- setas ±10ms;
-- Shift ±100ms;
-- Alt ±1ms.
+O Timing Editor usa apenas `localPath` e metadados necessários. Não consulta nem baixa `canonicalUrl`.
 
-## Regras para a versão Java
-- não portar HTML/JS;
-- reimplementar comportamento nativamente;
-- uma única Stage/Scene;
-- playback usa `SourceMedia.localPath`;
-- o original é somente leitura;
-- toda mídia derivada/cortada vai para diretório de projeto/workspace, nunca para Source Cache;
-- nenhum timing pode sair da duração real da mídia.
+## Requisitos de produto do Wave
+
+### Janela
+- permanece no mesmo Stage/Scene;
+- Wave substitui o conteúdo central;
+- não abre janela de etapa.
+
+### Timeline
+- mídia local define a timeline;
+- waveform corresponde à fonte local;
+- playhead corresponde ao playback real;
+- seleção IN/OUT é visual e editável;
+- IN e OUT nunca podem produzir intervalo inválido.
+
+### Interação
+- marcar IN/OUT pelo playhead;
+- arrastar limites;
+- seek pela waveform;
+- zoom;
+- pan/scroll quando houver zoom;
+- edição fina do timing;
+- feedback visual imediato.
+
+### Atalhos a validar contra o produto
+Antes do aceite final, o Orquestrador deve reconciliar os atalhos existentes com o requisito ativo. Nenhum conjunto legado deve ser tratado como definitivo apenas porque já está no código.
+
+Estado conhecido no código antecipado:
+- Space;
+- Shift+Space;
+- A;
+- S;
+- setas com passos 10ms / 100ms / 1ms.
+
+Esse código existe na branch, mas é **não autorizado/não aceito** até este handoff ser liberado.
+
+## Arquivo original
+O original no Source Cache é imutável.
+O recorte deve ser derivado e salvo fora de Source Cache.
 
 ## Contrato de saída proposto
-`MediaCut`
+MediaCut:
 - sourceId;
-- sourcePath;
-- outputPath;
+- localPath;
 - startMs;
 - endMs;
-- durationMs.
+- durationMs;
+- createdAt.
+
+### Invariantes
+- localPath existe;
+- sourceId corresponde ao SourceMedia;
+- startMs >= 0;
+- endMs <= SourceMedia.durationMs;
+- startMs < endMs;
+- recorte não sobrescreve a fonte original.
 
 ## Critérios de aceite
-- [x] playback local funcional;
-- [x] waveform real;
-- [x] IN/OUT por drag;
-- [x] edição precisa em ms;
-- [x] atalhos validados;
-- [x] zoom/pan;
-- [x] preview da seleção;
-- [x] persistência do recorte;
-- [x] arquivo derivado não altera Source Cache;
-- [x] testes de invariantes;
-- [x] mesma janela durante todo o fluxo;
-- [x] entrega ao Orquestrador.
+- [ ] SourceMedia local é carregado sem redownload;
+- [ ] playback funciona;
+- [ ] waveform representa a mídia;
+- [ ] playhead sincroniza com playback;
+- [ ] IN/OUT podem ser marcados e arrastados;
+- [ ] zoom funciona;
+- [ ] pan funciona em zoom;
+- [ ] nudges respeitam limites;
+- [ ] intervalos inválidos são impossíveis;
+- [ ] seleção pode ser reproduzida;
+- [ ] fonte inteira pode ser reproduzida;
+- [ ] recorte derivado é produzido sem alterar Source Cache;
+- [ ] MediaCut é persistido;
+- [ ] testes automatizados passam;
+- [ ] tudo continua na mesma Stage/Scene.
 
 ## Fora de escopo
-ASR, Cue Timing, WbW Timing, Shadowing e qualquer issue da Milestone 2.
+- ASR;
+- alinhamento de palavras;
+- regras de legenda;
+- render final;
+- Experience Validator;
+- QA;
+- Milestone 2.
+
+## Handoff de saída
+Retornar ao Orquestrador:
+1. arquivos alterados;
+2. testes;
+3. contrato MediaCut final;
+4. evidência de playback/waveform/corte;
+5. divergências de requisito encontradas;
+6. itens que o Experience Validator deve inspecionar.
