@@ -1,7 +1,7 @@
 # Handoff 005 — Issue #12 → QA / Review
 
 ## Status
-BLOQUEADO até PASS do Experience Validator ser aceito pelo Orquestrador.
+READY — Experience Validator PASS accepted by Orchestrator.
 
 ## Objetivo
 Executar o gate final da issue #12.
@@ -28,3 +28,15 @@ Qualquer falha relevante mantém #12 aberta.
 - PASS/FAIL;
 - evidências do commit candidato;
 - decisão recomendada ao Orquestrador.
+
+
+## Candidate context
+Experience Validator second pass: PASS.
+
+QA must pay special attention to the Windows installer gate. Earlier workflow runs reached the Setup install/uninstall phase but did not provide a clean final PASS. Treat installer lifecycle as a blocking gate, not as optional evidence.
+
+Current product/domain gates already accepted:
+- Desktop Runtime;
+- Source Ingestion & Cache;
+- Timing Editor technical delivery;
+- Experience Validator.
