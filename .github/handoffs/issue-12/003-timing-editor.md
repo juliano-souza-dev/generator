@@ -148,3 +148,24 @@ Adicionar teste que prove:
 O smoke `--timing-smoke` deve continuar passando no app-image e no aplicativo instalado.
 
 O Timing Editor permanece **IN PROGRESS** até esses gaps serem resolvidos.
+
+
+## Timing Editor Agent — correction return
+
+Corrections implemented after Experience Validator FAIL:
+- Super Zoom mode now reaches 64×;
+- timing edit history supports undo/redo;
+- per-source timing draft is autosaved atomically;
+- Wave restores the draft before falling back to the last rendered MediaCut;
+- back navigation blocks when autosave cannot protect changes;
+- save state is explicit in the UI;
+- Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z / Ctrl+S are wired;
+- keyboard focus has explicit visual treatment;
+- waveform drag commits one history step on release instead of flooding history.
+
+New domain tests:
+- `TimingHistoryTest`;
+- `TimingDraftRepositoryTest`;
+- expanded `WaveViewportTest` including 64×.
+
+Status: AWAITING CI EVIDENCE on the corrected build before Orchestrator re-acceptance.
