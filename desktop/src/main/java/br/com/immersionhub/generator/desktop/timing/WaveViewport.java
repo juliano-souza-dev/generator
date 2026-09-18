@@ -24,7 +24,7 @@ public final class WaveViewport {
     }
 
     public void setZoom(double value, long anchorMs) {
-        zoom = Math.max(1.0, Math.min(8.0, value));
+        zoom = Math.max(1.0, Math.min(64.0, value));
         long visible = visibleDurationMs();
         viewStartMs = clamp(anchorMs - visible / 2, 0, Math.max(0, durationMs - visible));
     }
