@@ -1,7 +1,7 @@
 # Handoff 001 — Issue #16 → Source Ingestion & Cache Agent
 
 ## Status
-READY
+DELIVERED
 
 ## Issue
 #16 — [P0][M1][Bug] Source do YouTube falha de forma intermitente e exige múltiplas tentativas
@@ -73,3 +73,14 @@ Sem rede:
 
 ## Gate
 Orquestrador aceita apenas com testes verdes e evidência de que uma única ação do usuário cobre a intermitência transitória.
+
+## Delivery evidence
+
+- JDK 21 local compilation: PASS;
+- deterministic transient retry harness: PASS;
+- definitive failure without retry harness: PASS;
+- format fallback + explicit FFmpeg harness: PASS;
+- Source Cache hit avoids inspect/download harness: PASS;
+- JUnit regression tests added to the branch;
+- PR #19 opened for CI/QA;
+- GitHub Actions did not start a check for the PR head at the time of delivery, so no CI PASS is claimed.
