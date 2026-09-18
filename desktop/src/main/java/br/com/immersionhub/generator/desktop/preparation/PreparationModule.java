@@ -1,0 +1,37 @@
+package br.com.immersionhub.generator.desktop.preparation;
+
+import br.com.immersionhub.generator.desktop.infrastructure.AppDirectories;
+import br.com.immersionhub.generator.desktop.infrastructure.BundledTools;
+import java.nio.file.Path;
+
+public final class PreparationModule {
+    public static final String PIPELINE_VERSION = "preparation-v1";
+    public static final String ASR_VERSION = "whisper.cpp-b5130-base.en";
+    public static final String ALIGNMENT_VERSION = "whisper.cpp-b5130-dtw-base.en";
+
+    private PreparationModule() {}
+
+    public static PreparationPipeline createPipeline() {
+        Path root = AppDirectories.workspaceDir().resolve("preparation");
+        Path model = BundledTools.whisperModel();
+
+        MaterialPreparationService preparation = new MaterialPreparationService(
+            new FfmpegTechnicalAudioExtractor(),
+            new WhisperCppAsrEngine(model, ASR_VERSION),
+            new FilePreparedMaterialRepository(root.resolve("prepared")),
+            root,
+            PIPELINE_VERSION
+        );
+
+        WordAlignmentService alignment = new WordAlignmentService(
+            new WhisperDtwWordAligner(model, "base.en", ALIGNMENT_VERSION),
+            new FileAlignedMaterialRepository(root.resolve("aligned"))
+        );
+
+        return new PreparationPipeline(
+            preparation,
+            alignment,
+            new PreparationLogger(AppDirectories.logsDir().resolve("preparation.log"))
+        );
+    }
+}
