@@ -23,7 +23,7 @@ from urllib.parse import urlencode, urlparse
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from youtube_pipeline import download_video, inspect_embed_support
 from ai_provider import groq_readiness, list_groq_models, public_ai_settings, save_ai_settings, test_groq_connection
@@ -3703,6 +3703,8 @@ class ValidateYouTubeRequest(BaseModel):
 
 
 class ConfigureRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     content_type: Literal["kit", "music"]
     transcription_mode: Literal["generator", "external"] = "external"
 
