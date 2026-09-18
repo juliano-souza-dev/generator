@@ -389,7 +389,7 @@ def build_instruction_payload(
             "Retorne SOMENTE um objeto JSON válido, sem Markdown, comentários ou texto externo.",
             "snapshot_id e generated_at_utc são protegidos: não regenere, não recalcule e não altere esses valores.",
             "source_snapshot_id deve copiar EXATAMENTE o snapshot_id canônico fornecido.",
-            "Não altere timings, order, speaker, approved_en, pt, words, Shadowing, Dual Scene ou qualquer campo técnico do canônico.",
+            "Não altere timings, order, speaker, approved_en, pt, words, Shadowing ou qualquer campo técnico do canônico.",
             "A saída de material em PDF é UM ÚNICO documento. Não devolva PDFs separados, transcript PDFs, guide PDF ou workbook PDF paralelo.",
             "How To Study é o BLOCO 1 depois da capa e é controlado pelo Generator. Não devolva nem reescreva esse bloco.",
             "Não inclua Anki como bloco do PDF. Os cards continuam em anki.items e são exportados separadamente pelo Generator/HUB.",
