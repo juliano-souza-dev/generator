@@ -196,6 +196,21 @@ jobs:
           Write-Host "Registered uninstall command: $uninstallCommand"
 
           if ($uninstallCommand -match '^"([^"]+)"\\s*(.*)
+            $uninstallExe = $Matches[1]
+            $uninstallTail = $Matches[2].Trim()
+          } else {
+            $parts = $uninstallCommand -split '\\s+', 2
+            $uninstallExe = $parts[0]
+            $uninstallTail = if ($parts.Count -gt 1) { $parts[1] } else { "" }
+          }
+
+          $uninstallArgs = if ([string]::IsNullOrWhiteSpace($uninstallTail)) {
+            @()
+          } else {
+            @($uninstallTail)
+          }
+          Invoke-BoundedProcess -FilePath $uninstallExe -Arguments $uninstallArgs -TimeoutSeconds 180 -Label "registered uninstall"
+
           if (Test-Path $installedExe) {
             throw "Installed launcher still exists after uninstall"
           }
