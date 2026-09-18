@@ -1,12 +1,6 @@
 name: Build Java Desktop Installer
 
 on:
-  push:
-    branches:
-      - "qa/issue-11-regression"
-    paths:
-      - "desktop/**"
-      - ".github/workflows/build-java-desktop.yml"
   pull_request:
     branches: [main]
     paths:
