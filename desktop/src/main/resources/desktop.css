@@ -1,0 +1,150 @@
+.app-root {
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-background-color: #0b0d12;
+}
+.top-bar {
+    -fx-background-color: #11151d;
+    -fx-border-color: transparent transparent #232936 transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.product-title {
+    -fx-text-fill: #f4f7fb;
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+}
+.section-label, .sidebar-kicker, .eyebrow {
+    -fx-text-fill: #8d98a8;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+.sidebar {
+    -fx-background-color: #0f131a;
+    -fx-border-color: transparent #232936 transparent transparent;
+    -fx-border-width: 0 1 0 0;
+}
+.nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #cbd3df;
+    -fx-alignment: CENTER_LEFT;
+    -fx-padding: 12 14;
+    -fx-background-radius: 8;
+}
+.nav-button:hover { -fx-background-color: #181e28; }
+.nav-button:disabled { -fx-opacity: .35; }
+.nav-button.nav-active {
+    -fx-background-color: #202938;
+    -fx-text-fill: white;
+}
+.content-page { -fx-background-color: #0b0d12; }
+.page-title {
+    -fx-text-fill: #f5f7fb;
+    -fx-font-size: 34px;
+    -fx-font-weight: 700;
+}
+.page-copy {
+    -fx-text-fill: #adb7c5;
+    -fx-font-size: 15px;
+    -fx-max-width: 760px;
+}
+.path-chip {
+    -fx-text-fill: #9fb7d9;
+    -fx-background-color: #141a24;
+    -fx-padding: 10 12;
+    -fx-background-radius: 8;
+}
+.source-field, .time-field {
+    -fx-background-color: #141923;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: #6f7b8c;
+    -fx-border-color: #2c3544;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 12;
+}
+.time-field {
+    -fx-font-family: "Consolas";
+    -fx-font-size: 13px;
+}
+.primary-button, .secondary-button {
+    -fx-font-weight: 700;
+    -fx-padding: 10 14;
+    -fx-background-radius: 8;
+}
+.primary-button {
+    -fx-background-color: #e9eef7;
+    -fx-text-fill: #0c1017;
+}
+.secondary-button {
+    -fx-background-color: #202633;
+    -fx-text-fill: #e4e9f1;
+}
+.wave-placeholder {
+    -fx-min-height: 220px;
+    -fx-max-width: 900px;
+    -fx-alignment: CENTER;
+    -fx-text-fill: #758196;
+    -fx-background-color: #10151d;
+    -fx-border-color: #2b3442;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+.wave-workspace-java {
+    -fx-padding: 14 0 0 0;
+}
+.video-column {
+    -fx-min-width: 560px;
+    -fx-max-width: 560px;
+}
+.video-shell-java {
+    -fx-min-width: 560px;
+    -fx-min-height: 315px;
+    -fx-background-color: black;
+    -fx-border-color: #293241;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+.wave-column {
+    -fx-min-width: 420px;
+}
+.playhead-label {
+    -fx-text-fill: #ffffff;
+    -fx-font-family: "Consolas";
+    -fx-font-size: 13px;
+}
+.duration-label {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: #141923;
+    -fx-padding: 11 14;
+    -fx-background-radius: 8;
+    -fx-font-family: "Consolas";
+}
+.shortcut-label {
+    -fx-text-fill: #7f8b9d;
+    -fx-font-size: 11px;
+}
+
+.primary-button:focused,
+.secondary-button:focused,
+.nav-button:focused,
+.source-field:focused,
+.time-field:focused,
+.waveform-pane:focused {
+    -fx-border-color: #8ab4ff;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+}
+
+.secondary-button:selected {
+    -fx-background-color: #33445f;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #8ab4ff;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+}
+
+.save-state-label {
+    -fx-text-fill: #b9c7d9;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}

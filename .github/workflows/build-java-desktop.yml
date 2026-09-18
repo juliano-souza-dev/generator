@@ -1,0 +1,215 @@
+name: Build Java Desktop Installer
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/build-java-desktop.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: java-desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 35
+
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: desktop/pom.xml
+
+      - name: Test and package Java app
+        shell: pwsh
+        run: |
+          mvn -B clean test package
+          mvn -B dependency:copy-dependencies -DoutputDirectory=target/app
+          Copy-Item "target/generator-desktop-0.1.0-test.jar" "target/app/generator-desktop.jar"
+
+          New-Item -ItemType Directory -Force -Path "target/app/tools" | Out-Null
+
+          $ytdlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe"
+          $ytdlpPath = "target/app/tools/yt-dlp.exe"
+          Invoke-WebRequest -Uri $ytdlpUrl -OutFile $ytdlpPath
+          $ytdlpExpected = "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
+          $ytdlpActual = (Get-FileHash -Path $ytdlpPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($ytdlpActual -ne $ytdlpExpected) { throw "Bundled source tool checksum mismatch" }
+
+          $ffmpegUrl = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2026-09-16-22-24/ffmpeg-N-126619-g8f1e6edbab-win64-gpl-shared.zip"
+          $ffmpegZip = "target/ffmpeg.zip"
+          Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip
+          $ffmpegExpected = "03af4e326f9904e8ec1ac405ee57b67867db3386c61f662d7e3821517d6b8e4d"
+          $ffmpegActual = (Get-FileHash -Path $ffmpegZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($ffmpegActual -ne $ffmpegExpected) { throw "Bundled media tool checksum mismatch" }
+
+          $ffmpegExtract = "target/ffmpeg-extract"
+          Expand-Archive -Path $ffmpegZip -DestinationPath $ffmpegExtract -Force
+          $ffmpegRoot = Get-ChildItem -Path $ffmpegExtract -Directory | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path "target/app/tools/ffmpeg" | Out-Null
+          Copy-Item -Path (Join-Path $ffmpegRoot.FullName "bin\*") -Destination "target/app/tools/ffmpeg" -Recurse -Force
+
+      - name: Build self-contained app image
+        shell: pwsh
+        run: jpackage --type app-image --name "ImmersionHub Generator" --dest target/app-image --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub"
+
+      - name: Smoke test bundled runtime and media pipeline
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "target/app-image/ImmersionHub Generator/ImmersionHub Generator.exe"
+          $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Java desktop smoke test failed with exit code $($process.ExitCode)" }
+
+          $ytdlp = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/yt-dlp.exe"
+          $ytdlpProcess = Start-Process -FilePath $ytdlp -ArgumentList "--version" -PassThru -Wait
+          if ($ytdlpProcess.ExitCode -ne 0) { throw "Bundled source tool smoke test failed" }
+
+          $ffmpeg = Resolve-Path "target/app-image/ImmersionHub Generator/app/tools/ffmpeg/ffmpeg.exe"
+          & $ffmpeg -hide_banner -loglevel error -version
+          if ($LASTEXITCODE -ne 0) { throw "Bundled media tool smoke test failed" }
+
+          $sample = (Join-Path (Get-Location) "target/timing-smoke-source.mp4")
+          & $ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc2=size=320x180:rate=30" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 2 -c:v libx264 -pix_fmt yuv420p -c:a aac $sample
+          if ($LASTEXITCODE -ne 0) { throw "Could not create timing smoke media" }
+
+          $timing = Start-Process -FilePath $exe -ArgumentList @("--timing-smoke", $sample) -PassThru -Wait
+          if ($timing.ExitCode -ne 0) { throw "Packaged timing pipeline smoke test failed with exit code $($timing.ExitCode)" }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "target/installer" | Out-Null
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler was not found" }
+          & $iscc "installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+
+      - name: Install and smoke test generated Setup
+        shell: pwsh
+        run: |
+          function Invoke-BoundedProcess {
+            param(
+              [Parameter(Mandatory=$true)][string]$FilePath,
+              [string[]]$Arguments = @(),
+              [int]$TimeoutSeconds = 180,
+              [string]$Label = "process"
+            )
+
+            Write-Host "PHASE: $Label"
+            Write-Host "RUN: $FilePath $($Arguments -join ' ')"
+            $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -PassThru
+
+            if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+              try { $process.Kill($true) } catch {}
+              throw "$Label timed out after $TimeoutSeconds seconds"
+            }
+
+            $process.Refresh()
+            if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
+              throw "$Label failed with exit code $($process.ExitCode)"
+            }
+          }
+
+          $installer = Get-ChildItem "target/installer" -Filter "*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "Windows installer was not generated" }
+
+          $installLog = Join-Path (Get-Location) "target/installer-install.log"
+          try {
+            Invoke-BoundedProcess -FilePath $installer.FullName -Arguments @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$installLog") -TimeoutSeconds 180 -Label "EXE install"
+          } catch {
+            if (Test-Path $installLog) {
+              Write-Host "===== installer log ====="
+              Get-Content $installLog
+              Write-Host "========================="
+            }
+            throw
+          }
+
+          $installDir = Join-Path $env:LOCALAPPDATA "Programs\ImmersionHub Generator"
+          $installedExe = Join-Path $installDir "ImmersionHub Generator.exe"
+          $dataDir = Join-Path $env:LOCALAPPDATA "ImmersionHub Generator"
+
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed launcher was not found at $installedExe"
+          }
+
+          $installDirFull = [IO.Path]::GetFullPath($installDir)
+          $dataDirFull = [IO.Path]::GetFullPath($dataDir)
+          if ($dataDirFull.StartsWith($installDirFull, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Persistent data directory is inside the application installation directory"
+          }
+
+          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--smoke-test") -TimeoutSeconds 90 -Label "installed launcher smoke"
+
+          $sample = Resolve-Path "target/timing-smoke-source.mp4"
+          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--timing-smoke", $sample) -TimeoutSeconds 120 -Label "installed timing smoke"
+
+          if (-not (Test-Path $dataDir)) {
+            throw "Persistent data directory was not created at $dataDir"
+          }
+
+          $persistenceMarker = Join-Path $dataDir "qa-persistence.marker"
+          Set-Content -Path $persistenceMarker -Value "keep" -Encoding UTF8
+
+          Write-Host "PHASE: discover registered uninstaller"
+          $uninstallRoots = @(
+            "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+            "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+          )
+          $entry = Get-ItemProperty -Path $uninstallRoots -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -eq "ImmersionHub Generator" } |
+            Select-Object -First 1
+
+          if (-not $entry) {
+            throw "Registered uninstaller for ImmersionHub Generator was not found"
+          }
+
+          $hasQuietUninstall = -not [string]::IsNullOrWhiteSpace([string]$entry.QuietUninstallString)
+          $uninstallCommand = if ($hasQuietUninstall) {
+            [string]$entry.QuietUninstallString
+          } else {
+            [string]$entry.UninstallString
+          }
+
+          if (-not $hasQuietUninstall) {
+            $uninstallCommand = "$uninstallCommand /VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+          }
+
+          Write-Host "Registered uninstall command: $uninstallCommand"
+          Invoke-BoundedProcess -FilePath "cmd.exe" -Arguments @("/d", "/s", "/c", $uninstallCommand) -TimeoutSeconds 180 -Label "registered uninstall"
+
+          if (Test-Path $installedExe) {
+            throw "Installed launcher still exists after uninstall"
+          }
+
+          if (-not (Test-Path $persistenceMarker)) {
+            throw "Uninstall removed persistent user data"
+          }
+
+          Write-Host "Installer lifecycle PASS: install, installed smoke, uninstall, persistent-data preservation"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImmersionHub-Generator-Java-Windows
+          path: desktop/target/installer/*.exe
+          if-no-files-found: error
+          retention-days: 14

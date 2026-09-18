@@ -1,0 +1,202 @@
+package br.com.immersionhub.generator.desktop.ui;
+
+import br.com.immersionhub.generator.desktop.timing.Boundary;
+import br.com.immersionhub.generator.desktop.timing.WaveViewport;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
+
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.LongConsumer;
+
+public final class WaveformPane extends Region {
+    private final Canvas canvas = new Canvas();
+    private List<Double> waveform = List.of();
+    private long durationMs = 1;
+    private long startMs = 0;
+    private long endMs = 1;
+    private long playheadMs = 0;
+    private WaveViewport viewport = new WaveViewport(1);
+    private Boundary dragging;
+    private BiConsumer<Long, Long> rangeListener = (start, end) -> {};
+    private LongConsumer seekListener = value -> {};
+    private Consumer<Boundary> boundaryListener = boundary -> {};
+    private Runnable rangeCommitListener = () -> {};
+    private boolean rangeChangedDuringDrag;
+
+    public WaveformPane() {
+        getChildren().add(canvas);
+        getStyleClass().add("waveform-pane");
+        setMinHeight(220);
+        setPrefHeight(220);
+        setFocusTraversable(true);
+
+        widthProperty().addListener((obs, oldValue, newValue) -> redraw());
+        heightProperty().addListener((obs, oldValue, newValue) -> redraw());
+
+        setOnMousePressed(event -> {
+            requestFocus();
+            double inX = msToX(startMs);
+            double outX = msToX(endMs);
+            if (Math.abs(event.getX() - inX) <= 12) {
+                dragging = Boundary.IN;
+                rangeChangedDuringDrag = false;
+                boundaryListener.accept(Boundary.IN);
+            } else if (Math.abs(event.getX() - outX) <= 12) {
+                dragging = Boundary.OUT;
+                rangeChangedDuringDrag = false;
+                boundaryListener.accept(Boundary.OUT);
+            } else {
+                long value = xToMs(event.getX());
+                playheadMs = value;
+                seekListener.accept(value);
+                redraw();
+            }
+        });
+
+        setOnMouseDragged(event -> {
+            if (dragging == null) return;
+            long value = xToMs(event.getX());
+            if (dragging == Boundary.IN) {
+                startMs = viewport.clampIn(value, endMs);
+            } else {
+                endMs = viewport.clampOut(value, startMs);
+            }
+            rangeChangedDuringDrag = true;
+            rangeListener.accept(startMs, endMs);
+            redraw();
+        });
+
+        setOnMouseReleased(event -> {
+            if (dragging != null && rangeChangedDuringDrag) {
+                rangeCommitListener.run();
+            }
+            dragging = null;
+            rangeChangedDuringDrag = false;
+        });
+
+        setOnScroll(event -> {
+            if (viewport.zoom() <= 1.0) return;
+            viewport.panByFraction(-0.12 * Math.signum(event.getDeltaY()));
+            redraw();
+            event.consume();
+        });
+    }
+
+    public void setWaveform(List<Double> waveform, long durationMs) {
+        this.waveform = waveform == null ? List.of() : List.copyOf(waveform);
+        this.durationMs = Math.max(1, durationMs);
+        this.viewport = new WaveViewport(this.durationMs);
+        this.endMs = Math.min(this.endMs, this.durationMs);
+        redraw();
+    }
+
+    public void setRange(long startMs, long endMs) {
+        this.startMs = clamp(startMs, 0, durationMs - 1);
+        this.endMs = clamp(endMs, this.startMs + 1, durationMs);
+        redraw();
+    }
+
+    public void setPlayheadMs(long playheadMs) {
+        this.playheadMs = clamp(playheadMs, 0, durationMs);
+        keepPlayheadVisible();
+        redraw();
+    }
+
+    public void setZoom(double zoom) {
+        viewport.setZoom(zoom, playheadMs);
+        redraw();
+    }
+
+    public void onRangeChanged(BiConsumer<Long, Long> listener) {
+        this.rangeListener = listener == null ? (start, end) -> {} : listener;
+    }
+
+    public void onSeek(LongConsumer listener) {
+        this.seekListener = listener == null ? value -> {} : listener;
+    }
+
+    public void onBoundarySelected(Consumer<Boundary> listener) {
+        this.boundaryListener = listener == null ? boundary -> {} : listener;
+    }
+
+    public void onRangeCommitted(Runnable listener) {
+        this.rangeCommitListener = listener == null ? () -> {} : listener;
+    }
+
+    @Override
+    protected void layoutChildren() {
+        canvas.setWidth(getWidth());
+        canvas.setHeight(getHeight());
+        redraw();
+    }
+
+    private void redraw() {
+        double width = Math.max(1, getWidth());
+        double height = Math.max(1, getHeight());
+        canvas.setWidth(width);
+        canvas.setHeight(height);
+
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        gc.setFill(Color.web("#10151d"));
+        gc.fillRect(0, 0, width, height);
+
+        long viewStartMs = viewport.viewStartMs();
+        long viewEnd = viewport.viewEndMs();
+        if (!waveform.isEmpty()) {
+            int first = (int) Math.floor((viewStartMs / (double) durationMs) * waveform.size());
+            int last = (int) Math.ceil((viewEnd / (double) durationMs) * waveform.size());
+            first = Math.max(0, Math.min(waveform.size() - 1, first));
+            last = Math.max(first + 1, Math.min(waveform.size(), last));
+            int count = last - first;
+
+            gc.setStroke(Color.web("#6e8fb9"));
+            gc.setLineWidth(1.0);
+            double centerY = height / 2.0;
+            for (int i = 0; i < count; i++) {
+                double x = i / (double) Math.max(1, count - 1) * width;
+                double amplitude = waveform.get(first + i);
+                double bar = amplitude * height * 0.44;
+                gc.strokeLine(x, centerY - bar, x, centerY + bar);
+            }
+        }
+
+        drawMarker(gc, msToX(startMs), "#44e5a0", "IN", height);
+        drawMarker(gc, msToX(endMs), "#ff9e64", "OUT", height);
+
+        double playX = msToX(playheadMs);
+        if (playX >= 0 && playX <= width) {
+            gc.setStroke(Color.WHITE);
+            gc.setLineWidth(1.0);
+            gc.strokeLine(playX, 0, playX, height);
+        }
+    }
+
+    private void drawMarker(GraphicsContext gc, double x, String color, String label, double height) {
+        if (x < 0 || x > getWidth()) return;
+        gc.setStroke(Color.web(color));
+        gc.setFill(Color.web(color));
+        gc.setLineWidth(2.0);
+        gc.strokeLine(x, 0, x, height);
+        gc.fillText(label, Math.max(4, Math.min(getWidth() - 28, x + 4)), 16);
+    }
+
+    private double msToX(long ms) {
+        return viewport.msToX(ms, getWidth());
+    }
+
+    private long xToMs(double x) {
+        return viewport.xToMs(x, getWidth());
+    }
+
+    private void keepPlayheadVisible() {
+        viewport.keepVisible(playheadMs);
+    }
+
+    private static long clamp(long value, long min, long max) {
+        return Math.max(min, Math.min(max, value));
+    }
+}
