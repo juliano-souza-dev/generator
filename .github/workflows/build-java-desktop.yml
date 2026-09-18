@@ -1,0 +1,64 @@
+name: Build Java Desktop Installer
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/build-java-desktop.yml"
+  workflow_dispatch:
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: desktop/pom.xml
+
+      - name: Test and package Java app
+        shell: pwsh
+        run: |
+          mvn -B clean test package
+          mvn -B dependency:copy-dependencies -DoutputDirectory=target/app
+          Copy-Item "target/generator-desktop-0.1.0-test.jar" "target/app/generator-desktop.jar"
+
+      - name: Build self-contained app image
+        shell: pwsh
+        run: jpackage --type app-image --name "ImmersionHub Generator" --dest target/app-image --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub"
+
+      - name: Smoke test bundled Java runtime
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "target/app-image/ImmersionHub Generator/ImmersionHub Generator.exe"
+          $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Java desktop smoke test failed with exit code $($process.ExitCode)" }
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: choco install wixtoolset --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: jpackage --type exe --name "ImmersionHub Generator" --dest target/installer --input target/app --main-jar generator-desktop.jar --main-class br.com.immersionhub.generator.desktop.GeneratorLauncher --app-version 0.1.0 --vendor "ImmersionHub" --description "ImmersionHub Generator Desktop" --win-per-user-install --win-menu --win-shortcut --win-dir-chooser
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImmersionHub-Generator-Java-Windows
+          path: desktop/target/installer/*.exe
+          if-no-files-found: error
+          retention-days: 14
