@@ -1,5 +1,6 @@
 package br.com.immersionhub.generator.desktop.source;
 
+import br.com.immersionhub.generator.desktop.infrastructure.BundledTools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -9,17 +10,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Supplier;
 
 public final class YtDlpSourceDownloader implements SourceDownloader {
-    private final Path executable;
+    private final Supplier<Path> executableSupplier;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public YtDlpSourceDownloader(Path executable) {
-        this.executable = executable.toAbsolutePath().normalize();
+    public YtDlpSourceDownloader() {
+        this(BundledTools::ytDlp);
+    }
+
+    YtDlpSourceDownloader(Supplier<Path> executableSupplier) {
+        this.executableSupplier = executableSupplier;
     }
 
     @Override
     public SourceDescriptor inspect(String canonicalUrl) throws Exception {
+        Path executable = executableSupplier.get();
         CommandResult result = run(List.of(
             executable.toString(),
             "--dump-single-json",
@@ -35,14 +42,14 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
         JsonNode json = mapper.readTree(result.output());
         String id = json.path("id").asText("");
         String title = json.path("title").asText("Fonte de vídeo");
-        double seconds = json.path("duration").asDouble(0);
-        long durationMs = Math.round(seconds * 1000.0);
+        long durationMs = Math.round(json.path("duration").asDouble(0) * 1000.0);
         return new SourceDescriptor(id, title, durationMs);
     }
 
     @Override
     public Path download(String canonicalUrl, Path targetDirectory) throws Exception {
         Files.createDirectories(targetDirectory);
+        Path executable = executableSupplier.get();
         String outputTemplate = targetDirectory.resolve("source.%(ext)s").toString();
 
         CommandResult result = run(List.of(
