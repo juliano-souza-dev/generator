@@ -247,10 +247,10 @@ public final class YtDlpSourceDownloader implements SourceDownloader {
     }
 
     private static String productMessage(String raw) {
-        String text = raw == null ? "" : raw.trim();
-        if (text.isEmpty()) return "Não foi possível preparar essa fonte.";
-        String lastLine = text.lines().reduce((left, right) -> right).orElse(text);
-        return lastLine.replaceFirst("^ERROR:\\s*", "").trim();
+        if (isDefinitiveFailure(raw)) {
+            return "Essa fonte não está disponível para preparação.";
+        }
+        return "Não foi possível preparar essa fonte agora. Tente novamente.";
     }
 
     @FunctionalInterface
