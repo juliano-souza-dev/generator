@@ -1,6 +1,12 @@
 name: Build Java Desktop Installer
 
 on:
+  push:
+    branches:
+      - "qa/issue-11-regression"
+    paths:
+      - "desktop/**"
+      - ".github/workflows/build-java-desktop.yml"
   pull_request:
     branches: [main]
     paths:
@@ -247,4 +253,3 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-# Issue #11 regression gate
