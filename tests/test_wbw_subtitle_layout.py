@@ -1,21 +1,21 @@
 from materials_final import _write_wbw_ass
 
 
-def test_wbw_ass_renders_english_words_without_pt_translation(tmp_path):
-    path = tmp_path / "wbw.ass"
+def test_vertical_wbw_subtitles_wrap_with_safe_margins_and_keep_highlight(tmp_path):
+    text = 'And then a person came into my life and helped me understand what really matters'
     words = [
-        {"text": "I", "start_ms": 0, "end_ms": 900},
-        {"text": "know", "start_ms": 900, "end_ms": 2000},
-        {"text": "this", "start_ms": 2000, "end_ms": 3000},
+        {'text': word, 'start_ms': i * 200, 'end_ms': (i + 1) * 200}
+        for i, word in enumerate(text.split())
     ]
+    path = tmp_path / 'captions.ass'
 
     _write_wbw_ass(
         {
-            "cues": [{
-                "speech_start_ms": 0,
-                "speech_end_ms": 4000,
-                "words": words,
-                "pt": "NAO EXIBIR TRADUCAO",
+            'cues': [{
+                'speech_start_ms': 0,
+                'speech_end_ms': 4000,
+                'words': words,
+                'pt': 'NAO EXIBIR TRADUCAO',
             }]
         },
         0,
@@ -23,6 +23,10 @@ def test_wbw_ass_renders_english_words_without_pt_translation(tmp_path):
         path,
     )
 
-    rendered = path.read_text(encoding="utf-8-sig")
-    assert "I know this" in rendered.replace(r"{\c&H55E6AA&}", "").replace(r"{\c&HFFFFFF&}", "")
-    assert "NAO EXIBIR TRADUCAO" not in rendered
+    output = path.read_text(encoding='utf-8-sig')
+    assert 'WrapStyle: 0' in output
+    assert 'WrapStyle: 2' not in output
+    assert 'PlayResX: 1080' in output and 'PlayResY: 1920' in output
+    assert ',96,96,420,1' in output
+    assert r'{\c&H55E6AA&}And' in output
+    assert 'NAO EXIBIR TRADUCAO' not in output
