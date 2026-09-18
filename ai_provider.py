@@ -15,13 +15,14 @@ except ImportError:  # pragma: no cover - handled with a friendly runtime messag
     Groq = None  # type: ignore[assignment]
 
 BASE_DIR = Path(__file__).resolve().parent
-SETTINGS_FILE = BASE_DIR / "settings" / "ai_settings.json"
+DATA_DIR = Path(os.environ.get("GENERATOR_DATA_DIR") or BASE_DIR).expanduser().resolve()
+SETTINGS_FILE = DATA_DIR / "settings" / "ai_settings.json"
 
 
 def migrate_legacy_ai_settings() -> None:
     """Keep credentials outside project snapshots and public media."""
-    active = BASE_DIR / "workspace" / "ai_settings.json"
-    legacy = [active, *sorted((BASE_DIR / "projects").glob("*/workspace/ai_settings.json"), key=lambda path: path.stat().st_mtime, reverse=True)]
+    active = DATA_DIR / "workspace" / "ai_settings.json"
+    legacy = [active, *sorted((DATA_DIR / "projects").glob("*/workspace/ai_settings.json"), key=lambda path: path.stat().st_mtime, reverse=True)]
     if not SETTINGS_FILE.exists():
         for source in legacy:
             if not source.is_file():
