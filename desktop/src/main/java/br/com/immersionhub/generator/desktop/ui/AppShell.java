@@ -18,12 +18,14 @@ public final class AppShell {
     private final Label sectionLabel = new Label("SOURCE");
     private final Button sourceButton = navButton("Source");
     private final Button waveButton = navButton("Wave");
+    private final Button preparationButton = navButton("Prepare");
 
     public AppShell() {
         root.getStyleClass().add("app-root");
         root.setTop(buildTopBar());
         root.setLeft(buildSidebar());
         setWaveEnabled(false);
+        setPreparationEnabled(false);
     }
 
     public Parent root() { return root; }
@@ -36,8 +38,16 @@ public final class AppShell {
         waveButton.setOnAction(event -> action.run());
     }
 
+    public void setPreparationAction(Runnable action) {
+        preparationButton.setOnAction(event -> action.run());
+    }
+
     public void setWaveEnabled(boolean enabled) {
         waveButton.setDisable(!enabled);
+    }
+
+    public void setPreparationEnabled(boolean enabled) {
+        preparationButton.setDisable(!enabled);
     }
 
     public void show(Node content, ScreenId screen) {
@@ -45,6 +55,7 @@ public final class AppShell {
         sectionLabel.setText(screen.name());
         setActive(sourceButton, screen == ScreenId.SOURCE);
         setActive(waveButton, screen == ScreenId.WAVE);
+        setActive(preparationButton, screen == ScreenId.PREPARATION);
     }
 
     private void setActive(Button button, boolean active) {
@@ -73,8 +84,9 @@ public final class AppShell {
 
         sourceButton.setMaxWidth(Double.MAX_VALUE);
         waveButton.setMaxWidth(Double.MAX_VALUE);
+        preparationButton.setMaxWidth(Double.MAX_VALUE);
 
-        VBox sidebar = new VBox(8, flow, sourceButton, waveButton);
+        VBox sidebar = new VBox(8, flow, sourceButton, waveButton, preparationButton);
         sidebar.setPadding(new Insets(22, 14, 22, 14));
         sidebar.setPrefWidth(200);
         sidebar.getStyleClass().add("sidebar");
