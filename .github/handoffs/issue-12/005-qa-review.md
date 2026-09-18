@@ -1,7 +1,25 @@
 # Handoff 005 — Issue #12 → QA / Review
 
 ## Status
-READY — liberado pelo Orquestrador após APPROVED do Experience Validator.
+CHANGES REQUESTED — falta provar o instalador executado, não apenas sua geração.
+
+## QA-01 — Install smoke ausente
+Owner: Desktop Runtime Agent
+
+O pipeline atual:
+- prova o app-image autocontido;
+- gera o instalador EXE;
+- publica o artefato.
+
+Mas não:
+- executa o instalador;
+- confirma a instalação per-user;
+- executa o launcher instalado;
+- desinstala ao final.
+
+**Correção exigida:** o CI deve instalar silenciosamente o EXE produzido, executar `--smoke-test` no launcher instalado e confirmar saída zero. Depois deve desinstalar silenciosamente.
+
+O QA permanece aberto até essa evidência existir.
 
 ## Build candidato
 GitHub Actions run `35368116777`.
