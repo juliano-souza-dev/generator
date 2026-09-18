@@ -44,7 +44,6 @@
   const groups = [
     ['hub', 'JSON do HUB', 'Arquivo final para importar no Admin do ImmersionHub.'],
     ['anki', 'Anki', 'Deck sem áudio e deck com TTS aprovado.'],
-    ['dual_scene', 'Vídeo Dual Scene', 'Blocos EN com destaque Word-by-Word alternados com os blocos PT sem legenda.'],
     ['music_video', 'Vídeo Music', 'Trecho vertical para TikTok com legendas Word-by-Word em inglês.'],
     ['shadowing_video', 'Vídeo Shadowing', 'Somente os trechos aprovados, com pausas de repetição e encerramento no último OUT.'],
     ['tts', 'Áudios TTS', 'Pacote WAV e manifest técnico gerados pela Groq.'],

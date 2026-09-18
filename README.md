@@ -17,7 +17,7 @@ Reinício do Generator com base multipágina e componentes reutilizáveis.
 ## Fluxo implementado
 
 1. `/` — Fonte YouTube EN: valida URL e verifica se o vídeo pode ser incorporado.
-2. `/config` — Configuração: `Kit/cena | Música`; em Kit pode ativar DualScene. DualScene exige URL PT válida e embedável em popup antes de avançar.
+2. `/config` — Configuração: `Kit/cena | Música` e modo de transcrição.
 3. `/wave` — Mini Wave Editor usando o componente global de timeline.
 4. `/process` — processamento técnico da mídia com logs em tempo real e artefatos clicáveis.
 5. `/external-ai` — JSON canônico + áudio + instruções + ZIP, seguido de drag-and-drop e validação do retorno da IA externa.
@@ -25,7 +25,7 @@ Reinício do Generator com base multipágina e componentes reutilizáveis.
 7. `/word-review` — revisão humana Word by Word; 100% das words e traduções precisam ser aceitas antes de avançar.
 8. `/cue-timing` — vídeo + WaveEditor global para ajustar IN/OUT de cada cue e cadastrar/atribuir speakers.
 9. `/word-timing` — timing WbW por word/unidade semântica, com preview EN/PT sincronizado e destaque conjunto.
-10. `/shadowing` — ramo `dualScene=false`: editor de blocos sequenciais com marcadores PAUSA/END e pausa de prática automática.
+10. `/shadowing` — editor de blocos sequenciais com marcadores PAUSA/END e pausa de prática automática.
 11. `/connected-speech` — exportação do pacote para análise externa de Connected Speech.
 12. `/connected-speech-import` — validação do JSON devolvido.
 13. `/connected-speech-review` — conferência manual dos fenômenos.
@@ -99,7 +99,7 @@ Editar manualmente EN ou PT de uma cue já aceita faz a cue voltar imediatamente
 
 ## Fora do escopo atual
 
-O ramo `dualScene=true` após WbW Time e o fluxo específico de Música permanecem fora do escopo desta Alpha.
+O fluxo específico de Música permanece fora do escopo desta Alpha.
 
 
 ## Alpha 1.5 — correção do upload JSON bruto
@@ -149,8 +149,7 @@ Cue Timing: zoom de waveform 1×–8× com pan/centralização e controle de vel
 
 ## Alpha 1.13 — Shadowing single scene por blocos
 
-- Após WbW Time, o fluxo agora bifurca pelo `configuration.dual_scene`.
-- Para `dualScene=false`, a próxima etapa é `/shadowing`; o ramo Dual Scene permanece bloqueado para implementação posterior.
+- Após WbW Time, a próxima etapa é `/shadowing`.
 - O WaveEditor global ganhou um `MarkerEditor` reutilizável para timelines baseadas em pontos, sem IN/OUT.
 - `A` marca **PAUSA** no playhead. O início de cada bloco é automático: bloco 1 começa em `0`, e cada bloco seguinte começa exatamente no ponto PAUSA anterior.
 - `E` marca **END** para encerrar antecipadamente. END só pode ficar depois do início do bloco atual e impede criar PAUSAs posteriores até ser removido.

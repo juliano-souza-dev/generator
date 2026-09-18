@@ -131,7 +131,7 @@
     $('continueConfig').disabled = true;
     setStatus($('configStatus'), 'Preparando a próxima página…', 'loading');
     try {
-      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:'kit', dual_scene:false, transcription_mode:transcriptionValue()})});
+      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:'kit', transcription_mode:transcriptionValue()})});
       window.location.assign(configured.next_url || '/wave');
     } catch (error) {
       setStatus($('configStatus'), error.message, 'error');
@@ -144,7 +144,7 @@
     $('continueConfig').disabled = true;
     setStatus($('configStatus'), contentType === 'music' ? 'Preparando o Wave Editor da música…' : 'Preparando a próxima página…', 'loading');
     try {
-      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:contentType, dual_scene:false, transcription_mode:transcriptionValue()})});
+      const configured = await api('/api/configure', {method:'POST', body:JSON.stringify({content_type:contentType, transcription_mode:transcriptionValue()})});
       window.location.assign(configured.next_url || '/wave');
     } catch (error) {
       setStatus($('configStatus'), error.message, 'error');
@@ -326,7 +326,7 @@
   async function restoreProcess() {
     const state = await api('/api/state');
     renderNavState(state);
-    renderProcessState({...state.process, next_url: state.resume_after_media || ((state.imported_final || state.media_refresh_preserve_reviews) ? (state.configuration?.dual_scene ? '/dual-scene' : '/cue-review') : '/external-ai')});
+    renderProcessState({...state.process, next_url: state.resume_after_media || ((state.imported_final || state.media_refresh_preserve_reviews) ? '/cue-review' : '/external-ai')});
     const status = String(state.process?.status || 'idle');
     if (status === 'idle') {
       await api('/api/process/start', {method:'POST'});
