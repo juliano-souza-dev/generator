@@ -246,3 +246,5 @@ jobs:
           path: desktop/target/installer/*.exe
           if-no-files-found: error
           retention-days: 14
+
+# Issue #11 regression gate
