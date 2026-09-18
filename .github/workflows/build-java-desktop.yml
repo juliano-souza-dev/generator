@@ -345,6 +345,70 @@ jobs:
 
           Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--smoke-test") -TimeoutSeconds 90 -Label "post-upgrade launcher smoke"
 
+          Write-Host "PHASE: upgrade while an external process locks runtime\\bin\\java.dll"
+          $runtimeDll = Join-Path $installDir "runtime\\bin\\java.dll"
+          $lockScript = Join-Path (Get-Location) "target\\hold-external-runtime-lock.ps1"
+          @'
+          param([string]$Path)
+          $stream = [System.IO.File]::Open(
+            $Path,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::None
+          )
+          try {
+            Start-Sleep -Seconds 180
+          } finally {
+            $stream.Dispose()
+          }
+          '@ | Set-Content -Path $lockScript -Encoding UTF8
+
+          $externalLock = Start-Process -FilePath "pwsh.exe" -ArgumentList @(
+            "-NoProfile",
+            "-File", $lockScript,
+            $runtimeDll
+          ) -PassThru
+          Start-Sleep -Seconds 2
+          $externalLock.Refresh()
+          if ($externalLock.HasExited) {
+            throw "External runtime lock helper exited before upgrade"
+          }
+
+          $externalLockLog = Join-Path (Get-Location) "target\\installer-external-lock-upgrade.log"
+          try {
+            Invoke-BoundedProcess -FilePath $installer.FullName -Arguments @(
+              "/VERYSILENT",
+              "/SUPPRESSMSGBOXES",
+              "/NORESTART",
+              "/RESTARTEXITCODE=3010",
+              "/CLOSEAPPLICATIONS",
+              "/FORCECLOSEAPPLICATIONS",
+              "/NORESTARTAPPLICATIONS",
+              "/LOG=$externalLockLog"
+            ) -TimeoutSeconds 180 -Label "external-lock repair upgrade"
+          } catch {
+            if (Test-Path $externalLockLog) {
+              Write-Host "===== external-lock upgrade log ====="
+              Get-Content $externalLockLog
+              Write-Host "====================================="
+            }
+            throw
+          } finally {
+            try {
+              $externalLock.Refresh()
+              if (-not $externalLock.HasExited) { $externalLock.Kill($true) }
+            } catch {}
+          }
+
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed launcher is missing after external-lock repair upgrade"
+          }
+          if (-not (Test-Path $persistenceMarker)) {
+            throw "External-lock repair upgrade removed persistent user data"
+          }
+
+          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--smoke-test") -TimeoutSeconds 90 -Label "post-external-lock launcher smoke"
+
           Write-Host "PHASE: discover registered uninstaller"
           $uninstallRoots = @(
             "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
@@ -398,7 +462,7 @@ jobs:
             throw "Uninstall removed persistent user data"
           }
 
-          Write-Host "Installer lifecycle PASS: install, repair upgrade, runtime completeness, installed smoke, uninstall, persistent-data preservation"
+          Write-Host "Installer lifecycle PASS: install, repair upgrade, external-lock upgrade, runtime completeness, installed smoke, uninstall, persistent-data preservation"
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
