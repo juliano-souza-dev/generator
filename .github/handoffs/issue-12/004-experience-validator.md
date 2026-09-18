@@ -1,7 +1,13 @@
 # Handoff 004 — Issue #12 → Experience Validator
 
 ## Status
-BLOQUEADO — aguarda aceite formal do Timing Editor Agent.
+READY — liberado pelo Orquestrador após aceite formal do Timing Editor Agent.
+
+## Build sob validação
+Head: `eaf29378286d734541f0707c831332511ff8dd66`
+CI de referência: `35367416279`.
+
+O Experience Validator não implementa correções. Divergências retornam ao agente owner por meio do Orquestrador.
 
 ## Entrada prevista
 - runtime desktop aceito;
