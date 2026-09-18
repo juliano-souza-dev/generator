@@ -1,7 +1,7 @@
 # Handoff 003 — Issue #12 → Timing Editor Agent
 
 ## Status
-BLOQUEADO até o Orquestrador aceitar formalmente o Source Ingestion & Cache Agent.
+READY — liberado pelo Orquestrador após aceite formal do Source Ingestion & Cache Agent.
 
 ## Issue
 #12
@@ -11,6 +11,9 @@ BLOQUEADO até o Orquestrador aceitar formalmente o Source Ingestion & Cache Age
 
 ## Agente owner
 Timing Editor Agent
+
+## Evidência de desbloqueio
+Source Ingestion & Cache Agent aceito pelo Orquestrador na issue #12.
 
 ## Entrada esperada
 Contrato congelado:
