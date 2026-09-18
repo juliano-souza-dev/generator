@@ -30,6 +30,12 @@ public final class GeneratorLauncher {
             return;
         }
 
+        if (arguments.contains("--installer-lock-smoke")) {
+            AppDirectories.prepare();
+            Thread.sleep(180_000L);
+            return;
+        }
+
         int timingIndex = arguments.indexOf("--timing-smoke");
         if (timingIndex >= 0) {
             if (timingIndex + 1 >= arguments.size()) {
