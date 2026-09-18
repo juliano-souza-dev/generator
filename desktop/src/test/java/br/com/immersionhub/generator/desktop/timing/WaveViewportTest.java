@@ -16,6 +16,17 @@ class WaveViewportTest {
     }
 
     @Test
+    void supportsSuperZoomUpToSixtyFourX() {
+        WaveViewport viewport = new WaveViewport(64_000);
+        viewport.setZoom(64.0, 32_000);
+        assertEquals(64.0, viewport.zoom(), 0.001);
+        assertEquals(1_000, viewport.visibleDurationMs());
+
+        viewport.setZoom(200.0, 32_000);
+        assertEquals(64.0, viewport.zoom(), 0.001);
+    }
+
+    @Test
     void mapsCoordinatesInsideZoomedViewport() {
         WaveViewport viewport = new WaveViewport(60_000);
         viewport.setZoom(2.0, 30_000);
