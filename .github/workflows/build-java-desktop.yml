@@ -333,22 +333,26 @@ jobs:
             throw "In-place upgrade removed persistent user data"
           }
 
-          $requiredRuntimeFiles = @(
-            (Join-Path $installDir "runtime\bin\java.dll"),
-            (Join-Path $installDir "runtime\bin\java.exe"),
-            (Join-Path $installDir "runtime\bin\javaw.exe"),
-            (Join-Path $installDir "runtime\bin\zip.dll"),
-            (Join-Path $installDir "runtime\bin\nio.dll"),
-            (Join-Path $installDir "runtime\bin\net.dll"),
-            (Join-Path $installDir "runtime\bin\server\jvm.dll"),
-            (Join-Path $installDir "app\tools\whisper\whisper-cli.exe"),
-            (Join-Path $installDir "app\tools\whisper\ggml-base.dll"),
-            (Join-Path $installDir "app\tools\whisper\ggml-cpu.dll"),
-            (Join-Path $installDir "app\tools\whisper\whisper.dll")
+          $packagedRoot = (Resolve-Path "target/app-image/ImmersionHub Generator").Path
+          $criticalRoots = @(
+            "runtime",
+            "app\tools\whisper",
+            "app\tools\ffmpeg"
           )
-          foreach ($requiredFile in $requiredRuntimeFiles) {
-            if (-not (Test-Path $requiredFile)) {
-              throw "Upgrade left a required runtime dependency missing: $requiredFile"
+          foreach ($relativeRoot in $criticalRoots) {
+            $sourceRoot = Join-Path $packagedRoot $relativeRoot
+            Get-ChildItem -Path $sourceRoot -File -Recurse | ForEach-Object {
+              $relativeFile = $_.FullName.Substring($packagedRoot.Length).TrimStart('\')
+              $installedFile = Join-Path $installDir $relativeFile
+              if (-not (Test-Path $installedFile)) {
+                throw "Upgrade left packaged dependency missing: $relativeFile"
+              }
+
+              $sourceLength = $_.Length
+              $installedLength = (Get-Item $installedFile).Length
+              if ($sourceLength -ne $installedLength) {
+                throw "Upgrade left packaged dependency with wrong size: $relativeFile"
+              }
             }
           }
 
