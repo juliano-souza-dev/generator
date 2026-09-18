@@ -13,6 +13,21 @@ class WhisperDtwWordAlignerTest {
     }
 
     @Test
+    void disablesFlashAttentionWheneverDtwAlignmentIsRequested() {
+        List<String> command = WhisperDtwWordAligner.command(
+            Path.of("whisper-cli.exe"),
+            Path.of("model.bin"),
+            Path.of("audio.wav"),
+            Path.of("result"),
+            "base.en"
+        );
+
+        assertTrue(command.contains("-dtw"));
+        assertTrue(command.contains("-nfa"));
+        assertTrue(command.indexOf("-nfa") > command.indexOf("-dtw"));
+    }
+
+    @Test
     void buildsWordBoundariesFromDtwTokenAnchorsAndPreservesAcceptedTranscript() throws Exception {
         Path dir = Files.createTempDirectory("dtw-json");
         Path json = dir.resolve("aligned.json");
