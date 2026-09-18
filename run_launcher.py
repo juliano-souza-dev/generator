@@ -56,7 +56,7 @@ def _download_cloudflared() -> Path:
     partial = target.with_suffix(target.suffix + ".download")
 
     print("[RUN] cloudflared não encontrado. Baixando binário oficial da Cloudflare...")
-    request = urllib.request.Request(url, headers={"User-Agent": "ImmersionHub-Generator/1.38"})
+    request = urllib.request.Request(url, headers={"User-Agent": "ImmersionHub-Generator/1.39"})
     try:
         with urllib.request.urlopen(request, timeout=90) as response, partial.open("wb") as out:
             shutil.copyfileobj(response, out)
@@ -79,6 +79,25 @@ def _find_cloudflared() -> Path:
     if local.is_file():
         return local
     return _download_cloudflared()
+
+
+def _public_tunnel_enabled() -> bool:
+    return os.environ.get("GENERATOR_PUBLIC_TUNNEL", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _lan_url() -> str | None:
+    """Return a best-effort private-network URL without publishing the app."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))
+        host = str(sock.getsockname()[0] or "").strip()
+    except OSError:
+        return None
+    finally:
+        sock.close()
+    if not host or host.startswith("127."):
+        return None
+    return f"http://{host}:{PORT}"
 
 
 def _wait_for_server(process: subprocess.Popen[bytes], timeout: float = 25.0) -> None:
@@ -144,7 +163,7 @@ def _show_mobile_access(url: str) -> Path | None:
 def main() -> int:
     print("=" * 68)
     print(" Media and Subtitle Generator · Alpha 1.39")
-    print(" Local + Mobile Quick Tunnel")
+    print(" Local + Mobile LAN")
     print("=" * 68)
 
     server: subprocess.Popen | None = None
@@ -165,6 +184,18 @@ def main() -> int:
         server = subprocess.Popen(server_cmd, cwd=ROOT)
         _wait_for_server(server)
         print(f"[RUN] Desktop/local: {LOCAL_URL}")
+        lan_url = _lan_url()
+        if lan_url:
+            print(f"[RUN] Rede local: {lan_url}")
+            _show_mobile_access(lan_url)
+        else:
+            print("[RUN] Endereço LAN não identificado; o Generator continua disponível no desktop.")
+
+        if not _public_tunnel_enabled():
+            print("[RUN] Modo local ativo. Túnel público desativado por padrão.")
+            print("[RUN] Para habilitar explicitamente: GENERATOR_PUBLIC_TUNNEL=1")
+            print("[RUN] Ctrl+C encerra o servidor.")
+            return server.wait()
 
         try:
             cloudflared = _find_cloudflared()
