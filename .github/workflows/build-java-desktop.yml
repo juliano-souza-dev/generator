@@ -263,6 +263,76 @@ jobs:
           $persistenceMarker = Join-Path $dataDir "qa-persistence.marker"
           Set-Content -Path $persistenceMarker -Value "keep" -Encoding UTF8
 
+          Write-Host "PHASE: upgrade while packaged runtime file is locked"
+          $runtimeDll = Join-Path $installDir "runtime\bin\java.dll"
+          if (-not (Test-Path $runtimeDll)) {
+            throw "Installed runtime lock target was not found at $runtimeDll"
+          }
+
+          $lockScript = Join-Path (Get-Location) "target\hold-runtime-lock.ps1"
+          @'
+          param([string]$Path)
+          $stream = [System.IO.File]::Open(
+            $Path,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::None
+          )
+          try {
+            Start-Sleep -Seconds 180
+          } finally {
+            $stream.Dispose()
+          }
+          '@ | Set-Content -Path $lockScript -Encoding UTF8
+
+          $lockProcess = Start-Process -FilePath "pwsh.exe" -ArgumentList @(
+            "-NoProfile",
+            "-File", $lockScript,
+            $runtimeDll
+          ) -PassThru
+          Start-Sleep -Seconds 2
+          $lockProcess.Refresh()
+          if ($lockProcess.HasExited) {
+            throw "Runtime lock regression helper exited before upgrade"
+          }
+
+          $upgradeLog = Join-Path (Get-Location) "target\installer-upgrade.log"
+          try {
+            Invoke-BoundedProcess -FilePath $installer.FullName -Arguments @(
+              "/VERYSILENT",
+              "/SUPPRESSMSGBOXES",
+              "/NORESTART",
+              "/CLOSEAPPLICATIONS",
+              "/FORCECLOSEAPPLICATIONS",
+              "/NORESTARTAPPLICATIONS",
+              "/LOG=$upgradeLog"
+            ) -TimeoutSeconds 180 -Label "locked-runtime upgrade"
+          } catch {
+            try {
+              $lockProcess.Refresh()
+              if (-not $lockProcess.HasExited) { $lockProcess.Kill($true) }
+            } catch {}
+            if (Test-Path $upgradeLog) {
+              Write-Host "===== upgrade installer log ====="
+              Get-Content $upgradeLog
+              Write-Host "================================="
+            }
+            throw
+          }
+
+          $lockProcess.Refresh()
+          if (-not $lockProcess.HasExited) {
+            try { $lockProcess.Kill($true) } catch {}
+            throw "Installer did not close the process holding runtime\bin\java.dll"
+          }
+
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed launcher is missing after in-place upgrade"
+          }
+          if (-not (Test-Path $persistenceMarker)) {
+            throw "In-place upgrade removed persistent user data"
+          }
+
           Write-Host "PHASE: discover registered uninstaller"
           $uninstallRoots = @(
             "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
@@ -316,7 +386,7 @@ jobs:
             throw "Uninstall removed persistent user data"
           }
 
-          Write-Host "Installer lifecycle PASS: install, installed smoke, uninstall, persistent-data preservation"
+          Write-Host "Installer lifecycle PASS: install, locked-runtime upgrade, installed smoke, uninstall, persistent-data preservation"
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
