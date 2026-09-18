@@ -122,11 +122,52 @@ jobs:
           $speechSource = (Join-Path (Get-Location) "target/jfk.wav")
           Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ggml-org/whisper.cpp/927cfce34f31707e17f2bff35c349632fb9e2c3a/samples/jfk.wav" -OutFile $speechSource
           $speech = (Join-Path (Get-Location) "target/preparation-smoke.wav")
-          & $ffmpeg -hide_banner -loglevel error -y -i $speechSource -af "apad=pad_dur=1" -t 4 -ac 1 -ar 16000 -c:a pcm_s16le $speech
+          & $ffmpeg -hide_banner -loglevel error -y -i $speechSource -t 2 -ac 1 -ar 16000 -c:a pcm_s16le $speech
           if ($LASTEXITCODE -ne 0) { throw "Could not prepare speech smoke media" }
 
-          $preparation = Start-Process -FilePath $exe -ArgumentList @("--preparation-smoke", $speech, "4000") -PassThru -Wait
-          if ($preparation.ExitCode -ne 0) { throw "Packaged preparation pipeline smoke test failed with exit code $($preparation.ExitCode)" }
+          $whisperSmokePrefix = (Join-Path (Get-Location) "target/whisper-smoke")
+          $whisperSmoke = Start-Process -FilePath $whisper -ArgumentList @(
+            "-m", $whisperModel,
+            "-f", $speech,
+            "-l", "en",
+            "-ng",
+            "-dtw", "base.en",
+            "-ojf",
+            "-of", $whisperSmokePrefix
+          ) -PassThru
+          if (-not $whisperSmoke.WaitForExit(120000)) {
+            try { $whisperSmoke.Kill($true) } catch {}
+            throw "Bundled ASR/alignment smoke timed out"
+          }
+          $whisperSmoke.Refresh()
+          if ($whisperSmoke.ExitCode -ne 0) { throw "Bundled ASR/alignment smoke failed with exit code $($whisperSmoke.ExitCode)" }
+
+          $whisperJson = "$whisperSmokePrefix.json"
+          if (-not (Test-Path $whisperJson)) { throw "Bundled ASR/alignment smoke did not produce JSON" }
+          $whisperResult = Get-Content $whisperJson -Raw | ConvertFrom-Json
+          $segments = @($whisperResult.transcription)
+          if ($segments.Count -lt 1) { throw "Bundled ASR smoke produced no transcription segments" }
+          $spokenText = (($segments | ForEach-Object { [string]$_.text }) -join " ").Trim()
+          if ([string]::IsNullOrWhiteSpace($spokenText)) { throw "Bundled ASR smoke produced empty transcription" }
+
+          $validDtwTokens = @(
+            $segments |
+              ForEach-Object { @($_.tokens) } |
+              Where-Object {
+                $_ -and
+                ([string]$_.text) -notmatch '^\[_' -and
+                [double]$_.t_dtw -ge 0
+              }
+          )
+          if ($validDtwTokens.Count -lt 1) { throw "Bundled alignment smoke produced no DTW token anchors" }
+
+          foreach ($segment in $segments) {
+            $from = [long]$segment.offsets.from
+            $to = [long]$segment.offsets.to
+            if ($from -lt 0 -or $to -le $from -or $to -gt 2000) {
+              throw "Bundled ASR/alignment smoke produced timing outside media duration"
+            }
+          }
 
       - name: Install Inno Setup
         shell: pwsh
@@ -201,12 +242,12 @@ jobs:
           $sample = Resolve-Path "target/timing-smoke-source.mp4"
           Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--timing-smoke", $sample) -TimeoutSeconds 120 -Label "installed timing smoke"
 
-          $installedPreparationCache = Join-Path $dataDir "workspace\preparation"
-          if (Test-Path $installedPreparationCache) {
-            Remove-Item -Path $installedPreparationCache -Recurse -Force
+          $installedWhisper = Join-Path $installDir "app\tools\whisper\whisper-cli.exe"
+          $installedWhisperModel = Join-Path $installDir "app\tools\whisper\models\ggml-base.en.bin"
+          if (-not (Test-Path $installedWhisper) -or -not (Test-Path $installedWhisperModel)) {
+            throw "Installed transcription runtime/model is missing"
           }
-          $speech = Resolve-Path "target/preparation-smoke.wav"
-          Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--preparation-smoke", $speech, "4000") -TimeoutSeconds 180 -Label "installed preparation smoke"
+          Invoke-BoundedProcess -FilePath $installedWhisper -Arguments @("--version") -TimeoutSeconds 30 -Label "installed transcription runtime smoke"
 
           if (-not (Test-Path $dataDir)) {
             throw "Persistent data directory was not created at $dataDir"
