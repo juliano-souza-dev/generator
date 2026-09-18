@@ -25,7 +25,9 @@ public final class FileAlignedMaterialRepository implements AlignedMaterialRepos
             }
             List<TimedText> words = snapshot.words == null
                 ? List.of()
-                : snapshot.words.stream().map(item -> new TimedText(item.text, item.startMs, item.endMs)).toList();
+                : snapshot.words.stream()
+                    .map(item -> new TimedText(item.text, item.startMs, item.endMs, item.confidence))
+                    .toList();
             return Optional.of(new AlignedMaterial(
                 snapshot.id,
                 preparedMaterial,
@@ -56,11 +58,15 @@ public final class FileAlignedMaterialRepository implements AlignedMaterialRepos
         public String text;
         public long startMs;
         public long endMs;
+        public Double confidence;
+
         public Timed() {}
+
         Timed(TimedText word) {
             text = word.text();
             startMs = word.startMs();
             endMs = word.endMs();
+            confidence = word.confidence();
         }
     }
 
@@ -70,6 +76,7 @@ public final class FileAlignedMaterialRepository implements AlignedMaterialRepos
         public String alignerVersion;
         public String createdAt;
         public List<Timed> words;
+
         public Snapshot() {}
 
         static Snapshot from(AlignedMaterial material) {
