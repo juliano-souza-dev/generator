@@ -1,7 +1,17 @@
 # Handoff 003 — Issue #12 → Timing Editor Agent
 
 ## Status
-READY — liberado pelo Orquestrador após aceite do Source Ingestion & Cache Agent.
+ACCEPTED — aprovado pelo Orquestrador após implementação, revisão de contrato e CI final verde.
+
+## Evidência de aceite
+GitHub Actions run `35367416279`:
+- Maven/tests: success;
+- app-image autocontida: success;
+- smoke do runtime: success;
+- FFmpeg empacotado: success;
+- waveform real em mídia sintética: success;
+- recorte real em mídia sintética: success;
+- instalador Windows: success.
 
 ## Dependência aceita
 Source Agent aprovado no GitHub Actions run `35366298728`.
@@ -58,18 +68,18 @@ O README atual registra:
 - durationMs.
 
 ## Critérios de aceite
-- [ ] playback local funcional;
-- [ ] waveform real;
-- [ ] IN/OUT por drag;
-- [ ] edição precisa em ms;
-- [ ] atalhos validados;
-- [ ] zoom/pan;
-- [ ] preview da seleção;
-- [ ] persistência do recorte;
-- [ ] arquivo derivado não altera Source Cache;
-- [ ] testes de invariantes;
-- [ ] mesma janela durante todo o fluxo;
-- [ ] entrega ao Orquestrador.
+- [x] playback local funcional;
+- [x] waveform real;
+- [x] IN/OUT por drag;
+- [x] edição precisa em ms;
+- [x] atalhos validados;
+- [x] zoom/pan;
+- [x] preview da seleção;
+- [x] persistência do recorte;
+- [x] arquivo derivado não altera Source Cache;
+- [x] testes de invariantes;
+- [x] mesma janela durante todo o fluxo;
+- [x] entrega ao Orquestrador.
 
 ## Fora de escopo
 ASR, Cue Timing, WbW Timing, Shadowing e qualquer issue da Milestone 2.
