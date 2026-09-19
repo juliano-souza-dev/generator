@@ -4,5 +4,6 @@ public enum ScreenId {
     HOME,
     SOURCE,
     WAVE,
-    PREPARATION
+    PREPARATION,
+    TRANSLATION
 }

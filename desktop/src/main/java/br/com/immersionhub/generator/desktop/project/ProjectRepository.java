@@ -86,6 +86,8 @@ public final class ProjectRepository {
         public List<String> completedStages;
         public String preparedMaterialId;
         public String alignedMaterialId;
+        public String translationMaterialId;
+        public String translationSource;
         public String createdAt;
         public String updatedAt;
 
@@ -110,6 +112,8 @@ public final class ProjectRepository {
             snapshot.completedStages = project.completedStages().stream().map(Enum::name).sorted().toList();
             snapshot.preparedMaterialId = project.preparedMaterialId();
             snapshot.alignedMaterialId = project.alignedMaterialId();
+            snapshot.translationMaterialId = project.translationMaterialId();
+            snapshot.translationSource = project.translationSource();
             snapshot.createdAt = project.createdAt().toString();
             snapshot.updatedAt = project.updatedAt().toString();
             return snapshot;
@@ -128,6 +132,13 @@ public final class ProjectRepository {
                 for (String value : completedStages) completed.add(ProjectStage.valueOf(value));
             }
 
+            ProjectStage migratedStage = ProjectStage.valueOf(currentStage);
+            if (version < 2
+                && migratedStage == ProjectStage.PREPARATION
+                && completed.contains(ProjectStage.PREPARATION)) {
+                migratedStage = ProjectStage.TRANSLATION;
+            }
+
             return new ProjectState(
                 ProjectState.CURRENT_SCHEMA_VERSION,
                 projectId,
@@ -142,10 +153,12 @@ public final class ProjectRepository {
                 cutEndMs,
                 cutPath,
                 cutCreatedAt,
-                ProjectStage.valueOf(currentStage),
+                migratedStage,
                 completed,
                 preparedMaterialId,
                 alignedMaterialId,
+                translationMaterialId,
+                translationSource,
                 Instant.parse(createdAt),
                 Instant.parse(updatedAt)
             );

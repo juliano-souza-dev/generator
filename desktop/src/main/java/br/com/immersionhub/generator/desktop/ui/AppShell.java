@@ -20,6 +20,7 @@ public final class AppShell {
     private final Button sourceButton = navButton("Source");
     private final Button waveButton = navButton("Wave");
     private final Button preparationButton = navButton("Prepare");
+    private final Button translationButton = navButton("Translation");
 
     public AppShell() {
         root.getStyleClass().add("app-root");
@@ -27,6 +28,7 @@ public final class AppShell {
         root.setLeft(buildSidebar());
         setWaveEnabled(false);
         setPreparationEnabled(false);
+        setTranslationEnabled(false);
     }
 
     public Parent root() { return root; }
@@ -47,12 +49,20 @@ public final class AppShell {
         preparationButton.setOnAction(event -> action.run());
     }
 
+    public void setTranslationAction(Runnable action) {
+        translationButton.setOnAction(event -> action.run());
+    }
+
     public void setWaveEnabled(boolean enabled) {
         waveButton.setDisable(!enabled);
     }
 
     public void setPreparationEnabled(boolean enabled) {
         preparationButton.setDisable(!enabled);
+    }
+
+    public void setTranslationEnabled(boolean enabled) {
+        translationButton.setDisable(!enabled);
     }
 
     public void show(Node content, ScreenId screen) {
@@ -62,6 +72,7 @@ public final class AppShell {
         setActive(sourceButton, screen == ScreenId.SOURCE);
         setActive(waveButton, screen == ScreenId.WAVE);
         setActive(preparationButton, screen == ScreenId.PREPARATION);
+        setActive(translationButton, screen == ScreenId.TRANSLATION);
     }
 
     private void setActive(Button button, boolean active) {
@@ -92,8 +103,9 @@ public final class AppShell {
         sourceButton.setMaxWidth(Double.MAX_VALUE);
         waveButton.setMaxWidth(Double.MAX_VALUE);
         preparationButton.setMaxWidth(Double.MAX_VALUE);
+        translationButton.setMaxWidth(Double.MAX_VALUE);
 
-        VBox sidebar = new VBox(8, flow, homeButton, sourceButton, waveButton, preparationButton);
+        VBox sidebar = new VBox(8, flow, homeButton, sourceButton, waveButton, preparationButton, translationButton);
         sidebar.setPadding(new Insets(22, 14, 22, 14));
         sidebar.setPrefWidth(200);
         sidebar.getStyleClass().add("sidebar");
