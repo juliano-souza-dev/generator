@@ -79,6 +79,30 @@ public record ProjectState(
         );
     }
 
+    public ProjectState withSource(SourceMedia source) {
+        return new ProjectState(
+            CURRENT_SCHEMA_VERSION,
+            projectId,
+            source.title(),
+            source.sourceId(),
+            source.canonicalUrl(),
+            source.localPath().toString(),
+            source.title(),
+            source.durationMs(),
+            source.fetchedAt().toString(),
+            null,
+            null,
+            null,
+            null,
+            ProjectStage.WAVE,
+            EnumSet.of(ProjectStage.SOURCE),
+            null,
+            null,
+            createdAt,
+            Instant.now()
+        );
+    }
+
     public ProjectState withCut(MediaCut cut) {
         if (!sourceId.equals(cut.sourceId())) {
             throw new IllegalArgumentException("O recorte não pertence à fonte do projeto.");
