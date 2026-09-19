@@ -46,6 +46,7 @@ public final class WaveView {
     private final MediaProcessor mediaProcessor;
     private final MediaCutRepository cutRepository;
     private final TimingDraftRepository draftRepository;
+    private final Path cutOutputDirectory;
     private final Consumer<MediaCut> cutSavedAction;
     private final TimingSelection selection;
     private final TimingHistory history;
@@ -75,10 +76,33 @@ public final class WaveView {
         Consumer<MediaCut> cutSavedAction,
         Runnable backAction
     ) {
+        this(
+            sourceMedia,
+            mediaProcessor,
+            cutRepository,
+            draftRepository,
+            AppDirectories.workspaceDir().resolve("timing"),
+            existingCut,
+            cutSavedAction,
+            backAction
+        );
+    }
+
+    public WaveView(
+        SourceMedia sourceMedia,
+        MediaProcessor mediaProcessor,
+        MediaCutRepository cutRepository,
+        TimingDraftRepository draftRepository,
+        Path cutOutputDirectory,
+        MediaCut existingCut,
+        Consumer<MediaCut> cutSavedAction,
+        Runnable backAction
+    ) {
         this.sourceMedia = sourceMedia;
         this.mediaProcessor = mediaProcessor;
         this.cutRepository = cutRepository;
         this.draftRepository = draftRepository;
+        this.cutOutputDirectory = cutOutputDirectory.toAbsolutePath().normalize();
         this.cutSavedAction = cutSavedAction;
         this.selection = new TimingSelection(sourceMedia.durationMs());
 
@@ -181,7 +205,7 @@ public final class WaveView {
             protected Path call() throws Exception {
                 return mediaProcessor.preview(
                     sourceMedia,
-                    AppDirectories.workspaceDir().resolve("timing")
+                    cutOutputDirectory
                 );
             }
         };
