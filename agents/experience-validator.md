@@ -46,3 +46,15 @@ Correções retornam ao agente owner correspondente.
 
 ## Encerramento
 QA só pode ser liberado se o Orquestrador aceitar o PASS do Experience Validator.
+
+## Experiência de produto consolidada — 2026-09-19
+- Validar o caminho completo do usuário, não apenas o componente alterado.
+- Home precisa listar projetos e retomar a última etapa válida sem processamento pesado automático.
+- Wave só passa com frame visível, áudio coerente, waveform, playhead e seleção sincronizados em mídia real.
+- Preparação só passa com progresso por subetapa e sem bloqueio por DTW quando ASR válido existe.
+- Tradução só passa quando Groq é principal sem esconder o fallback e o pacote externo permanece disponível mesmo após sucesso.
+- Em falha Groq, o usuário precisa ter caminho claro de recuperação sem perder material preparado.
+- Retorno externo inválido deve ser recusado preservando o último material válido.
+- Segredos não podem aparecer em logs visíveis, labels, snapshots ou mensagens de erro.
+- Retomada após fechar/reabrir deve ser validada em pós-corte, pós-preparação e pós-tradução.
+- CI verde é insuficiente para requisito visual/interativo; exigir evidência compatível com a natureza do requisito.
