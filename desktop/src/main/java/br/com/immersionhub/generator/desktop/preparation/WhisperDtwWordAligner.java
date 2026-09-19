@@ -104,28 +104,82 @@ public final class WhisperDtwWordAligner implements WordAligner {
             List<AnchoredWord> anchored = groupWordAnchors(segment.path("tokens"));
             if (anchored.isEmpty()) continue;
 
-            for (int index = 0; index < anchored.size(); index++) {
-                AnchoredWord current = anchored.get(index);
-                long start = index == 0
-                    ? segmentStart
-                    : midpoint(anchored.get(index - 1).anchorMs(), current.anchorMs());
-                long end = index == anchored.size() - 1
-                    ? segmentEnd
-                    : midpoint(current.anchorMs(), anchored.get(index + 1).anchorMs());
-
-                start = Math.max(segmentStart, start);
-                end = Math.min(segmentEnd, end);
-                if (end <= start) {
-                    throw new IOException("Âncoras DTW não formam uma sequência temporal válida.");
-                }
-                words.add(new TimedText(current.text(), start, end, current.confidence()));
-            }
+            words.addAll(buildTimedWords(segmentIndex, anchored, segmentStart, segmentEnd));
         }
 
         if (words.isEmpty()) {
             throw new IOException("Alinhamento não produziu palavras.");
         }
         AlignedMaterial.validate(words, durationMs);
+        return words;
+    }
+
+    private static List<TimedText> buildTimedWords(
+        int segmentIndex,
+        List<AnchoredWord> anchored,
+        long segmentStart,
+        long segmentEnd
+    ) throws IOException {
+        List<TimedText> words = new ArrayList<>(anchored.size());
+
+        long previousAnchor = Long.MIN_VALUE;
+        for (int index = 0; index < anchored.size(); index++) {
+            long anchor = anchored.get(index).anchorMs();
+            if (anchor < previousAnchor) {
+                throw new IOException(
+                    "Âncoras DTW regressivas: segment[" + segmentIndex + "] word[" + index
+                        + "] anchorMs=" + anchor + ", previousAnchorMs=" + previousAnchor + "."
+                );
+            }
+            previousAnchor = anchor;
+        }
+
+        int runStart = 0;
+        while (runStart < anchored.size()) {
+            long anchor = anchored.get(runStart).anchorMs();
+            int runEnd = runStart + 1;
+            while (runEnd < anchored.size() && anchored.get(runEnd).anchorMs() == anchor) {
+                runEnd++;
+            }
+
+            long leftBound = runStart == 0
+                ? segmentStart
+                : midpoint(anchored.get(runStart - 1).anchorMs(), anchor);
+            long rightBound = runEnd == anchored.size()
+                ? segmentEnd
+                : midpoint(anchor, anchored.get(runEnd).anchorMs());
+
+            leftBound = Math.max(segmentStart, leftBound);
+            rightBound = Math.min(segmentEnd, rightBound);
+
+            int runSize = runEnd - runStart;
+            long available = rightBound - leftBound;
+            if (available < runSize) {
+                throw new IOException(
+                    "Âncoras DTW sem espaço temporal suficiente: segment[" + segmentIndex
+                        + "] runStartWord[" + runStart + "] runSize=" + runSize
+                        + ", anchorMs=" + anchor + ", leftMs=" + leftBound
+                        + ", rightMs=" + rightBound + "."
+                );
+            }
+
+            for (int offset = 0; offset < runSize; offset++) {
+                AnchoredWord current = anchored.get(runStart + offset);
+                long start = leftBound + ((available * offset) / runSize);
+                long end = leftBound + ((available * (offset + 1L)) / runSize);
+                if (end <= start) {
+                    throw new IOException(
+                        "Âncoras DTW não formam uma sequência temporal válida: segment[" + segmentIndex
+                            + "] word[" + (runStart + offset) + "] startMs=" + start
+                            + ", endMs=" + end + ", anchorMs=" + anchor + "."
+                    );
+                }
+                words.add(new TimedText(current.text(), start, end, current.confidence()));
+            }
+
+            runStart = runEnd;
+        }
+
         return words;
     }
 
