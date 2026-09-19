@@ -72,7 +72,34 @@ class WhisperDtwWordAlignerTest {
     }
 
     @Test
-    void rejectsDtwWordOutsideCutDuration() throws Exception {
+    void clampsResidualDtwOvershootAtRealCutBoundary() throws Exception {
+        Path dir = Files.createTempDirectory("dtw-boundary");
+        Path json = dir.resolve("aligned.json");
+        Files.writeString(json, """
+            {
+              "transcription": [
+                {
+                  "offsets":{"from":132120,"to":134200},
+                  "text":" final sign.",
+                  "tokens":[
+                    {"text":" final","t_dtw":13250},
+                    {"text":" sign","t_dtw":13380},
+                    {"text":".","t_dtw":13400}
+                  ]
+                }
+              ]
+            }
+            """);
+
+        List<TimedText> result = aligner(dir).parseDtwWords(json, 134182);
+
+        assertEquals(134182, result.getLast().endMs());
+        assertTrue(result.getFirst().startMs() >= 132120);
+        assertDoesNotThrow(() -> AlignedMaterial.validate(result, 134182));
+    }
+
+    @Test
+    void rejectsMaterialDtwOvershootAndReportsSegment() throws Exception {
         Path dir = Files.createTempDirectory("dtw-range");
         Path json = dir.resolve("aligned.json");
         Files.writeString(json, """
@@ -86,6 +113,10 @@ class WhisperDtwWordAlignerTest {
               ]
             }
             """);
-        assertThrows(IOException.class, () -> aligner(dir).parseDtwWords(json, 1000));
+
+        IOException error = assertThrows(IOException.class, () -> aligner(dir).parseDtwWords(json, 1000));
+        assertTrue(error.getMessage().contains("segment[0]"));
+        assertTrue(error.getMessage().contains("endMs=1200"));
+        assertTrue(error.getMessage().contains("durationMs=1000"));
     }
 }
