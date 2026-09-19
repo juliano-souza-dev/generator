@@ -34,3 +34,13 @@ Source/download, IN/OUT, Groq/IA externa, pedagogia ou materiais finais.
 
 ## Saída
 AlignedMaterial refinado ou fallback ASR explícito, evidências/riscos e handoff ao Orchestrator.
+
+## Experiência de produto consolidada — 2026-09-19
+- DTW é refinamento de qualidade, nunca gate fatal da Preparação.
+- Runs de palavras com a mesma âncora podem ser legítimos e devem ser distribuídos deterministicamente numa janela válida.
+- Regressão temporal real continua erro do refinamento.
+- Overshoot residual final segue a mesma política de borda do ASR.
+- Se o refinamento falhar e o ASR estiver válido, publicar fallback ASR explícito e seguir.
+- A origem dos timings deve ficar persistida para diagnóstico/retomada sem virar detalhe técnico da UI.
+- Reabrir snapshot em fallback não deve reexecutar DTW automaticamente.
+- Não acumular exceções para tornar um refinamento experimental “infalível”; proteger o produto com fallback seguro.
