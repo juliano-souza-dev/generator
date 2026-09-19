@@ -71,3 +71,13 @@ O agente não libera Experience Validator. Entrega ao Orquestrador para aceite f
 - Reabrir projeto pós-corte deve restaurar recorte/drafts sem reexecutar Source nem refazer o corte.
 - Nenhum preview, corte ou waveform pode disparar novo download.
 - UI não expõe FFmpeg, codec, container ou detalhes internos.
+
+
+## Maturidade acumulada — M5 Review Workspace
+- A separação interna entre Cue Review, Word by Word, Cue Timing e Word Timing não deve aparecer como quatro experiências fragmentadas.
+- Timing humano da M5 acontece dentro do **Review Workspace único**, junto de vídeo, waveform, EN/PT, unidade selecionada, grupo e speaker.
+- Autosave é mecânica de persistência e nunca equivale a aprovação humana.
+- A ação principal de decisão é **Aprovar e avançar**.
+- Atalhos são requisito de produtividade para revisão massiva, não refinamento opcional.
+- O contexto ativo define o alvo temporal: cue selecionada ajusta cue; word/grupo selecionado ajusta a unidade.
+- Não criar nova tela exclusiva de Cue Timing ou Word Timing sem uma decisão explícita de produto que substitua este contrato.
