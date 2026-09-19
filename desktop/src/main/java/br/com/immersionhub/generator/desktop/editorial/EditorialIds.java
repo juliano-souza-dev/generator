@@ -28,6 +28,8 @@ final class EditorialIds {
             update(digest, schemaVersion);
             update(digest, translationMaterialId);
 
+            boolean includeIndividualPt = !"1.0".equals(schemaVersion);
+
             for (EditorialCue cue : cues) {
                 update(digest, Integer.toString(cue.order()));
                 update(digest, Long.toString(cue.speechStartMs()));
@@ -45,6 +47,7 @@ final class EditorialIds {
                     update(digest, word.originalEn());
                     update(digest, word.approvedEn());
                     update(digest, word.pt());
+                    if (includeIndividualPt) update(digest, word.individualPt());
                     update(digest, word.startMs() == null ? "" : Long.toString(word.startMs()));
                     update(digest, word.endMs() == null ? "" : Long.toString(word.endMs()));
                     update(digest, word.confidence() == null ? "" : word.confidence().toString());
