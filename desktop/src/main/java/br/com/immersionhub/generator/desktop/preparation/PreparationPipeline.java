@@ -33,8 +33,13 @@ public final class PreparationPipeline {
             AlignedMaterial aligned;
             try {
                 aligned = alignment.align(prepared);
-                logger.info("prepare.alignment.ready alignedId=" + aligned.id() + " words=" + aligned.words().size());
-                listener.accept(PreparationStage.ALIGNMENT_READY);
+                if (aligned.timingSource() == TimingSource.ASR_BASE) {
+                    logger.info("prepare.alignment.cached-fallback alignedId=" + aligned.id() + " words=" + aligned.words().size());
+                    listener.accept(PreparationStage.USING_BASE_TIMINGS);
+                } else {
+                    logger.info("prepare.alignment.ready alignedId=" + aligned.id() + " words=" + aligned.words().size());
+                    listener.accept(PreparationStage.ALIGNMENT_READY);
+                }
             } catch (Exception alignmentFailure) {
                 logger.warn("prepare.alignment.fallback materialId=" + prepared.id(), alignmentFailure);
                 aligned = alignment.fallbackToAsr(prepared);
