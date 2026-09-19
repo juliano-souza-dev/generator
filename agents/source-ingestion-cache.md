@@ -42,3 +42,11 @@ O Orquestrador deve fornecer:
 - formato de metadados;
 - contrato de mídia entregue ao Wave;
 - handoff ao Orquestrador.
+
+## Experiência de produto consolidada — 2026-09-19
+- Source Cache é a fonte canônica da mídia original. Etapas posteriores nunca devem corrigir incompatibilidade redownloadando a origem.
+- Mídia válida para processamento pode não ser renderizável diretamente no player; isso não é falha do Source.
+- Preview compatível pertence ao Wave como derivado local e nunca substitui a mídia original.
+- SourceMedia deve carregar identidade e referência local estável suficientes para retomada sem nova aquisição.
+- Ao reabrir projeto, fonte válida existente deve ser reutilizada imediatamente.
+- UI fala em origem, disponibilidade e ação do usuário; cache, hashes, ferramentas e paths ficam fora da experiência normal.
