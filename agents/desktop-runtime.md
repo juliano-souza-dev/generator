@@ -57,3 +57,16 @@ Implementação de runtime/persistência, migrações, testes, evidências de up
 - Preparação e Tradução concluídas devem ser restauradas por snapshot validado, não por simples existência de arquivo.
 - Chaves/segredos de sessão não pertencem ao estado persistido.
 - Upgrade, repair e uninstall devem preservar dados persistentes fora da instalação.
+
+
+## Maturidade acumulada — Issue #46
+- A revisão editorial possui lifecycle explícito no ProjectState: NOT_STARTED, IN_PROGRESS, COMPLETED ou INVALID.
+- O ProjectState registra a fase editorial atual: CUE_REVIEW, WORD_REVIEW ou COMPLETE.
+- O snapshot editorial referencia o material persistido, sua versão, a TranslationMaterial de origem, cue atual, cursor Word by Word e timestamp de atividade.
+- O arquivo editorial continua sendo a fonte dos textos, aprovações e grupos; o ProjectState é a fonte de lifecycle, dependência e ponto de retomada.
+- Projeto legado pode adotar um artefato editorial válido já existente ao migrar, sem perder trabalho.
+- Estado de projeto desatualizado pode ser sincronizado com um artefato editorial válido; isso não exige reprocessamento pesado.
+- Se um projeto afirma possuir revisão em andamento/concluída e o artefato estiver ausente ou corrompido, marcar somente a revisão como INVALID.
+- Corrupção editorial nunca deve disparar Source, Wave, Preparação ou Groq automaticamente.
+- Reconstrução de revisão é ação explícita do usuário e reutiliza a TranslationMaterial válida já existente.
+- Retomada prioriza cursores persistidos no ProjectState e usa os cursores editoriais locais apenas como fallback/migração.

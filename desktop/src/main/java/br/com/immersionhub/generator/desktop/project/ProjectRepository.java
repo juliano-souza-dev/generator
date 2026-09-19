@@ -89,6 +89,15 @@ public final class ProjectRepository {
         public String alignedMaterialId;
         public String translationMaterialId;
         public String translationSource;
+        public String editorialMaterialId;
+        public String editorialTranslationMaterialId;
+        public String editorialSchemaVersion;
+        public String editorialStatus;
+        public String editorialPhase;
+        public Integer editorialCueOrder;
+        public Integer editorialWordCueOrder;
+        public Integer editorialWordIndex;
+        public String editorialUpdatedAt;
         public String createdAt;
         public String updatedAt;
 
@@ -115,6 +124,15 @@ public final class ProjectRepository {
             snapshot.alignedMaterialId = project.alignedMaterialId();
             snapshot.translationMaterialId = project.translationMaterialId();
             snapshot.translationSource = project.translationSource();
+            snapshot.editorialMaterialId = project.editorialMaterialId();
+            snapshot.editorialTranslationMaterialId = project.editorialTranslationMaterialId();
+            snapshot.editorialSchemaVersion = project.editorialSchemaVersion();
+            snapshot.editorialStatus = project.editorialStatus().name();
+            snapshot.editorialPhase = project.editorialPhase().name();
+            snapshot.editorialCueOrder = project.editorialCueOrder();
+            snapshot.editorialWordCueOrder = project.editorialWordCueOrder();
+            snapshot.editorialWordIndex = project.editorialWordIndex();
+            snapshot.editorialUpdatedAt = project.editorialUpdatedAt();
             snapshot.createdAt = project.createdAt().toString();
             snapshot.updatedAt = project.updatedAt().toString();
             return snapshot;
@@ -143,6 +161,17 @@ public final class ProjectRepository {
                 migratedStage = ProjectStage.EDITORIAL_REVIEW;
             }
 
+            EditorialProjectStatus migratedEditorialStatus = version < 4
+                ? EditorialProjectStatus.NOT_STARTED
+                : parseEditorialStatus(editorialStatus);
+            EditorialProjectPhase migratedEditorialPhase = version < 4
+                ? EditorialProjectPhase.CUE_REVIEW
+                : parseEditorialPhase(editorialPhase);
+
+            if (version < 4) {
+                completed.remove(ProjectStage.EDITORIAL_REVIEW);
+            }
+
             return new ProjectState(
                 ProjectState.CURRENT_SCHEMA_VERSION,
                 projectId,
@@ -163,9 +192,28 @@ public final class ProjectRepository {
                 alignedMaterialId,
                 translationMaterialId,
                 translationSource,
+                version < 4 ? null : editorialMaterialId,
+                version < 4 ? null : editorialTranslationMaterialId,
+                version < 4 ? null : editorialSchemaVersion,
+                migratedEditorialStatus,
+                migratedEditorialPhase,
+                version < 4 ? null : editorialCueOrder,
+                version < 4 ? null : editorialWordCueOrder,
+                version < 4 ? null : editorialWordIndex,
+                version < 4 ? null : editorialUpdatedAt,
                 Instant.parse(createdAt),
                 Instant.parse(updatedAt)
             );
+        }
+
+        private static EditorialProjectStatus parseEditorialStatus(String value) {
+            if (value == null || value.isBlank()) return EditorialProjectStatus.NOT_STARTED;
+            return EditorialProjectStatus.valueOf(value);
+        }
+
+        private static EditorialProjectPhase parseEditorialPhase(String value) {
+            if (value == null || value.isBlank()) return EditorialProjectPhase.CUE_REVIEW;
+            return EditorialProjectPhase.valueOf(value);
         }
     }
 }
