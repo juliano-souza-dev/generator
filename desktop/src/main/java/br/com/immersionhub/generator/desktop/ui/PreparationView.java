@@ -38,7 +38,7 @@ public final class PreparationView {
         Consumer<AlignedMaterial> completedAction,
         Runnable backAction
     ) {
-        this(cut, pipeline, completedAction, backAction, null, true);
+        this(cut, pipeline, completedAction, backAction, null, true, false);
     }
 
     public PreparationView(
@@ -48,6 +48,18 @@ public final class PreparationView {
         Runnable backAction,
         AlignedMaterial existingMaterial,
         boolean startAutomatically
+    ) {
+        this(cut, pipeline, completedAction, backAction, existingMaterial, startAutomatically, false);
+    }
+
+    public PreparationView(
+        MediaCut cut,
+        PreparationPipeline pipeline,
+        Consumer<AlignedMaterial> completedAction,
+        Runnable backAction,
+        AlignedMaterial existingMaterial,
+        boolean startAutomatically,
+        boolean needsRecovery
     ) {
         this.cut = Objects.requireNonNull(cut);
         this.pipeline = Objects.requireNonNull(pipeline);
@@ -107,8 +119,12 @@ public final class PreparationView {
             start();
         } else {
             progress.setVisible(false);
-            status.setText("Preparação pausada.");
-            detail.setText("Continue quando estiver pronto. As etapas anteriores não serão refeitas.");
+            status.setText(needsRecovery ? "A preparação salva precisa ser refeita." : "Preparação pausada.");
+            detail.setText(
+                needsRecovery
+                    ? "A fonte e o recorte foram preservados. Continue para refazer somente esta etapa."
+                    : "Continue quando estiver pronto. As etapas anteriores não serão refeitas."
+            );
             retry.setText("Continuar preparação");
             retry.setVisible(true);
             retry.setManaged(true);
