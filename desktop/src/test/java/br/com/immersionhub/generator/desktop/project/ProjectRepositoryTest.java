@@ -30,6 +30,9 @@ class ProjectRepositoryTest {
         assertEquals(ProjectStage.PREPARATION, loaded.minimumResumeStage());
         assertTrue(loaded.completedStages().contains(ProjectStage.SOURCE));
         assertTrue(loaded.completedStages().contains(ProjectStage.WAVE));
+        assertEquals(ProjectStageStatus.COMPLETED, loaded.stageStatus(ProjectStage.SOURCE));
+        assertEquals(ProjectStageStatus.COMPLETED, loaded.stageStatus(ProjectStage.WAVE));
+        assertEquals(ProjectStageStatus.IN_PROGRESS, loaded.stageStatus(ProjectStage.PREPARATION));
         assertEquals(100, loaded.mediaCut().orElseThrow().startMs());
         assertEquals(900, loaded.mediaCut().orElseThrow().endMs());
     }
@@ -44,6 +47,7 @@ class ProjectRepositoryTest {
         Files.delete(cut.outputPath());
 
         assertEquals(ProjectStage.WAVE, state.minimumResumeStage());
+        assertEquals(ProjectStageStatus.NEEDS_REPROCESSING, state.stageStatus(ProjectStage.WAVE));
         assertTrue(state.recoveryMessage().contains("Wave"));
         assertTrue(state.sourceMedia().isPresent());
         assertTrue(state.mediaCut().isEmpty());
