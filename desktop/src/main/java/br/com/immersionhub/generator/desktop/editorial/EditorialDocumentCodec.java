@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -44,6 +43,7 @@ final class EditorialDocumentCodec {
             }
 
             validateWordSequence(editorial);
+            validateSemanticGroups(editorial);
             validateWordOrigins(editorial, translated.words());
         }
 
@@ -65,6 +65,62 @@ final class EditorialDocumentCodec {
                 throw new IllegalArgumentException(
                     "Ordem de words não corresponde ao English aprovado da cue " + cue.order() + "."
                 );
+            }
+        }
+    }
+
+    private static void validateSemanticGroups(EditorialCue cue) {
+        int index = 0;
+        while (index < cue.words().size()) {
+            EditorialWord word = cue.words().get(index);
+
+            if (word.semanticGroupRole() == SemanticGroupRole.NONE) {
+                if (!word.semanticGroupId().isEmpty()) {
+                    throw new IllegalArgumentException("Grupo inválido na cue " + cue.order() + ".");
+                }
+                index++;
+                continue;
+            }
+
+            if (word.semanticGroupRole() != SemanticGroupRole.LEAD) {
+                throw new IllegalArgumentException(
+                    "Grupo sem líder no início da unidade na cue " + cue.order() + "."
+                );
+            }
+
+            String groupId = word.semanticGroupId();
+            int start = index;
+            index++;
+
+            while (index < cue.words().size()
+                && cue.words().get(index).semanticGroupId().equals(groupId)) {
+                EditorialWord member = cue.words().get(index);
+                if (member.semanticGroupRole() != SemanticGroupRole.MEMBER) {
+                    throw new IllegalArgumentException(
+                        "Grupo possui mais de um líder na cue " + cue.order() + "."
+                    );
+                }
+                if (!member.pt().isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "Somente o líder pode conter a tradução do grupo na cue " + cue.order() + "."
+                    );
+                }
+                index++;
+            }
+
+            if (index - start < 2) {
+                throw new IllegalArgumentException(
+                    "Grupo semântico precisa conter ao menos duas words na cue " + cue.order() + "."
+                );
+            }
+
+            EditorialReviewStatus status = cue.words().get(start).reviewStatus();
+            for (int memberIndex = start + 1; memberIndex < index; memberIndex++) {
+                if (cue.words().get(memberIndex).reviewStatus() != status) {
+                    throw new IllegalArgumentException(
+                        "Grupo semântico possui estados de revisão divergentes na cue " + cue.order() + "."
+                    );
+                }
             }
         }
     }
@@ -235,6 +291,7 @@ final class EditorialDocumentCodec {
         public String originalEn;
         public String approvedEn;
         public String pt;
+        public String individualPt;
         public Long startMs;
         public Long endMs;
         public Double confidence;
@@ -250,6 +307,7 @@ final class EditorialDocumentCodec {
             document.originalEn = word.originalEn();
             document.approvedEn = word.approvedEn();
             document.pt = word.pt();
+            document.individualPt = word.individualPt();
             document.startMs = word.startMs();
             document.endMs = word.endMs();
             document.confidence = word.confidence();
@@ -260,11 +318,13 @@ final class EditorialDocumentCodec {
         }
 
         EditorialWord toWord() {
+            String restoredIndividualPt = individualPt == null ? pt : individualPt;
             return new EditorialWord(
                 index,
                 originalEn,
                 approvedEn,
                 pt,
+                restoredIndividualPt,
                 startMs,
                 endMs,
                 confidence,
