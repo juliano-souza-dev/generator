@@ -15,6 +15,14 @@ public final class EditorialModule {
         );
     }
 
+    public static WordReviewService createWordReviewService(String projectId) {
+        Path directory = directory(projectId);
+        return new WordReviewService(
+            new FileEditorialMaterialRepository(directory),
+            new WordReviewCursorRepository(directory)
+        );
+    }
+
     public static Path directory(String projectId) {
         String safe = projectId.replaceAll("[^A-Za-z0-9._-]", "_");
         return AppDirectories.projectsDir().resolve(safe).resolve("editorial");
