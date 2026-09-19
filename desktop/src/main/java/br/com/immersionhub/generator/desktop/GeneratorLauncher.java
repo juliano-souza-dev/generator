@@ -24,7 +24,10 @@ public final class GeneratorLauncher {
 
         if (arguments.contains("--smoke-test")) {
             AppDirectories.prepare();
-            if (ScreenId.SOURCE == null || ScreenId.WAVE == null || ScreenId.PREPARATION == null) {
+            if (ScreenId.SOURCE == null
+                || ScreenId.WAVE == null
+                || ScreenId.PREPARATION == null
+                || ScreenId.TRANSLATION == null) {
                 throw new IllegalStateException("Desktop navigation contract unavailable.");
             }
             return;
