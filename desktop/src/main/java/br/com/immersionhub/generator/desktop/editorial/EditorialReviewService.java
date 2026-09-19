@@ -11,13 +11,23 @@ import java.util.OptionalInt;
 public final class EditorialReviewService {
     private final EditorialMaterialRepository repository;
     private final EditorialReviewCursorRepository cursorRepository;
+    private final EditorialWordReconciler wordReconciler;
 
     public EditorialReviewService(
         EditorialMaterialRepository repository,
         EditorialReviewCursorRepository cursorRepository
     ) {
+        this(repository, cursorRepository, new EditorialWordReconciler());
+    }
+
+    EditorialReviewService(
+        EditorialMaterialRepository repository,
+        EditorialReviewCursorRepository cursorRepository,
+        EditorialWordReconciler wordReconciler
+    ) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.cursorRepository = Objects.requireNonNull(cursorRepository, "cursorRepository");
+        this.wordReconciler = Objects.requireNonNull(wordReconciler, "wordReconciler");
     }
 
     public EditorialMaterial loadOrCreate(TranslationMaterial translation) throws Exception {
@@ -37,10 +47,12 @@ public final class EditorialReviewService {
         String approvedEn,
         String pt
     ) throws Exception {
-        return replaceCue(
+        return updateCue(
             material,
             cueOrder,
-            cue(material, cueOrder).withReview(approvedEn, pt, EditorialReviewStatus.PENDING)
+            approvedEn,
+            pt,
+            EditorialReviewStatus.PENDING
         );
     }
 
@@ -50,10 +62,12 @@ public final class EditorialReviewService {
         String approvedEn,
         String pt
     ) throws Exception {
-        return replaceCue(
+        return updateCue(
             material,
             cueOrder,
-            cue(material, cueOrder).withReview(approvedEn, pt, EditorialReviewStatus.APPROVED)
+            approvedEn,
+            pt,
+            EditorialReviewStatus.APPROVED
         );
     }
 
@@ -62,18 +76,18 @@ public final class EditorialReviewService {
         TranslationMaterial translation,
         int cueOrder
     ) throws Exception {
-        EditorialCue current = cue(material, cueOrder);
         TranslationCue source = translation.cues().stream()
             .filter(value -> value.order() == cueOrder)
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Cue não encontrada na tradução."));
 
-        EditorialCue restored = current.withReview(
+        return updateCue(
+            material,
+            cueOrder,
             source.approvedEn(),
             source.pt(),
             EditorialReviewStatus.PENDING
         );
-        return replaceCue(material, cueOrder, restored);
     }
 
     public int loadCursor(EditorialMaterial material) {
@@ -95,14 +109,62 @@ public final class EditorialReviewService {
         return OptionalInt.empty();
     }
 
+    private EditorialMaterial updateCue(
+        EditorialMaterial material,
+        int cueOrder,
+        String approvedEn,
+        String pt,
+        EditorialReviewStatus status
+    ) throws Exception {
+        Objects.requireNonNull(material, "material");
+        EditorialCue current = cue(material, cueOrder);
+        String normalizedEn = approvedEn == null ? "" : approvedEn.trim();
+
+        EditorialWordReconciliationResult reconciliation = null;
+        EditorialCue replacement;
+
+        if (!normalizedEn.equals(current.approvedEn())) {
+            reconciliation = wordReconciler.reconcile(current.words(), normalizedEn);
+            replacement = current.withReviewAndWords(
+                normalizedEn,
+                pt,
+                status,
+                reconciliation.words()
+            );
+        } else {
+            replacement = current.withReview(normalizedEn, pt, status);
+        }
+
+        return replaceCue(material, cueOrder, replacement, reconciliation);
+    }
+
     private EditorialMaterial replaceCue(
         EditorialMaterial material,
         int cueOrder,
-        EditorialCue replacement
+        EditorialCue replacement,
+        EditorialWordReconciliationResult reconciliation
     ) throws Exception {
         List<EditorialCue> cues = new ArrayList<>(material.cues());
         cues.set(cueOrder - 1, replacement);
-        EditorialMaterial updated = material.withCues(cues);
+
+        EditorialMaterial updated;
+        if (reconciliation == null) {
+            updated = material.withCues(cues);
+        } else {
+            updated = material.withReconciliation(
+                cues,
+                new EditorialReconciliation(
+                    material.id(),
+                    cueOrder,
+                    EditorialReconciliationReason.APPROVED_EN_EDIT,
+                    reconciliation.preservedWords(),
+                    reconciliation.insertedWords(),
+                    reconciliation.removedWords(),
+                    reconciliation.invalidatedGroups()
+                )
+            );
+        }
+
         repository.save(updated);
         cursorRepository.save(cueOrder, updated.cues().size());
         return updated;
