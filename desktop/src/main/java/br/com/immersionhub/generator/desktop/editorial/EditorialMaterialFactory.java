@@ -25,6 +25,23 @@ public final class EditorialMaterialFactory {
     }
 
     private static EditorialCue cue(TranslationCue source) {
+        List<EditorialWord> words = words(source);
+
+        return new EditorialCue(
+            source.order(),
+            source.speechStartMs(),
+            source.speechEndMs(),
+            source.subtitleStartMs(),
+            source.subtitleEndMs(),
+            source.speaker(),
+            source.originalEn(),
+            source.approvedEn(),
+            source.pt(),
+            EditorialReviewStatus.PENDING,
+            words
+        );
+    }
+    static List<EditorialWord> words(TranslationCue source) {
         List<EditorialWord> words = new ArrayList<>();
         for (int index = 0; index < source.words().size(); index++) {
             var word = source.words().get(index);
@@ -41,19 +58,7 @@ public final class EditorialMaterialFactory {
                 EditorialReviewStatus.PENDING
             ));
         }
-
-        return new EditorialCue(
-            source.order(),
-            source.speechStartMs(),
-            source.speechEndMs(),
-            source.subtitleStartMs(),
-            source.subtitleEndMs(),
-            source.speaker(),
-            source.originalEn(),
-            source.approvedEn(),
-            source.pt(),
-            EditorialReviewStatus.PENDING,
-            words
-        );
+        return List.copyOf(words);
     }
+
 }
