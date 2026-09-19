@@ -95,12 +95,11 @@ public final class WhisperDtwWordAligner implements WordAligner {
         }
 
         List<TimedText> words = new ArrayList<>();
-        for (JsonNode segment : transcription) {
+        for (int segmentIndex = 0; segmentIndex < transcription.size(); segmentIndex++) {
+            JsonNode segment = transcription.get(segmentIndex);
             long segmentStart = WhisperCppAsrEngine.offsetMs(segment, "from");
-            long segmentEnd = WhisperCppAsrEngine.offsetMs(segment, "to");
-            if (segmentStart < 0 || segmentEnd <= segmentStart || segmentEnd > durationMs) {
-                throw new IOException("Resultado de alinhamento fora da duração.");
-            }
+            long rawSegmentEnd = WhisperCppAsrEngine.offsetMs(segment, "to");
+            long segmentEnd = normalizeSegmentEnd(segmentIndex, segmentStart, rawSegmentEnd, durationMs);
 
             List<AnchoredWord> anchored = groupWordAnchors(segment.path("tokens"));
             if (anchored.isEmpty()) continue;
@@ -220,6 +219,40 @@ public final class WhisperDtwWordAligner implements WordAligner {
             preserved.add(new TimedText(original, timing.startMs(), timing.endMs(), timing.confidence()));
         }
         return preserved;
+    }
+
+    private static long normalizeSegmentEnd(
+        int segmentIndex,
+        long segmentStart,
+        long segmentEnd,
+        long durationMs
+    ) throws IOException {
+        if (segmentStart < 0 || segmentEnd <= segmentStart || segmentStart >= durationMs) {
+            throw invalidSegment(segmentIndex, segmentStart, segmentEnd, durationMs);
+        }
+        if (segmentEnd <= durationMs) {
+            return segmentEnd;
+        }
+
+        long overshoot = segmentEnd - durationMs;
+        if (overshoot <= AsrTimelineNormalizer.END_BOUNDARY_TOLERANCE_MS) {
+            return durationMs;
+        }
+        throw invalidSegment(segmentIndex, segmentStart, segmentEnd, durationMs);
+    }
+
+    private static IOException invalidSegment(
+        int segmentIndex,
+        long segmentStart,
+        long segmentEnd,
+        long durationMs
+    ) {
+        return new IOException(
+            "Resultado de alinhamento fora da duração: segment[" + segmentIndex
+                + "] startMs=" + segmentStart
+                + ", endMs=" + segmentEnd
+                + ", durationMs=" + durationMs + "."
+        );
     }
 
     private static long midpoint(long left, long right) {
