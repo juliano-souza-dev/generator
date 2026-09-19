@@ -283,9 +283,12 @@ public final class NavigationController {
     private void acceptEditorialProgress(EditorialMaterial material, Integer cueOrder) {
         editorialMaterial = material;
         editorialCueOrder = cueOrder == null ? 1 : cueOrder;
+        wordReviewPosition = null;
 
         if (editorialMaterial.cuesApproved()) {
             ensureWordReviewInitialized();
+        } else {
+            wordReviewService = null;
         }
 
         if (projectState != null) {
@@ -356,6 +359,8 @@ public final class NavigationController {
         editorialReviewService = null;
         editorialMaterial = null;
         editorialCueOrder = 1;
+        wordReviewService = null;
+        wordReviewPosition = null;
         editorialNeedsRecovery = false;
     }
 
