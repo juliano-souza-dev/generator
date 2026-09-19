@@ -20,7 +20,8 @@ public final class FileTranslationMaterialRepository implements TranslationMater
         if (!Files.isRegularFile(file)) return Optional.empty();
         try {
             String json = Files.readString(file);
-            return Optional.of(codec.parseAndValidate(json, expectedBase, TranslationSource.GROQ));
+            TranslationSource source = readSource();
+            return Optional.of(codec.parseAndValidate(json, expectedBase, source));
         } catch (Exception ignored) {
             return Optional.empty();
         }
@@ -36,6 +37,25 @@ public final class FileTranslationMaterialRepository implements TranslationMater
             Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException exception) {
             Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        Path sourceTemporary = root.resolve("translation-source.tmp");
+        Path sourceTarget = root.resolve("translation-source.txt");
+        Files.writeString(sourceTemporary, material.source().name());
+        try {
+            Files.move(sourceTemporary, sourceTarget, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(sourceTemporary, sourceTarget, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private TranslationSource readSource() {
+        Path source = root.resolve("translation-source.txt");
+        if (!Files.isRegularFile(source)) return TranslationSource.GROQ;
+        try {
+            return TranslationSource.valueOf(Files.readString(source).trim());
+        } catch (Exception ignored) {
+            return TranslationSource.GROQ;
         }
     }
 
