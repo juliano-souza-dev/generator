@@ -155,6 +155,33 @@ public record ProjectState(
         );
     }
 
+    public ProjectState withoutPreparation() {
+        Set<ProjectStage> completed = EnumSet.noneOf(ProjectStage.class);
+        completed.addAll(completedStages);
+        completed.remove(ProjectStage.PREPARATION);
+        return new ProjectState(
+            CURRENT_SCHEMA_VERSION,
+            projectId,
+            title,
+            sourceId,
+            canonicalUrl,
+            sourcePath,
+            sourceTitle,
+            sourceDurationMs,
+            sourceFetchedAt,
+            cutStartMs,
+            cutEndMs,
+            cutPath,
+            cutCreatedAt,
+            ProjectStage.PREPARATION,
+            completed,
+            null,
+            null,
+            createdAt,
+            Instant.now()
+        );
+    }
+
     public boolean preparationCompleted() {
         return completedStages.contains(ProjectStage.PREPARATION)
             && preparedMaterialId != null && !preparedMaterialId.isBlank()
