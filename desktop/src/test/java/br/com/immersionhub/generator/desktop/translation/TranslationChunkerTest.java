@@ -13,7 +13,7 @@ class TranslationChunkerTest {
     @Test
     void preservesCueBoundariesAndOrderAcrossChunks() {
         List<TranslationCue> cues = new ArrayList<>();
-        for (int i = 1; i <= 12; i++) {
+        for (int i = 1; i <= 40; i++) {
             cues.add(new TranslationCue(
                 i,
                 (i - 1) * 1000L,
