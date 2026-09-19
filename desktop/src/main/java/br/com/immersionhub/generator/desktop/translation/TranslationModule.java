@@ -17,12 +17,17 @@ public final class TranslationModule {
             key = environment == null ? "" : environment.trim();
         }
 
+        TranslationLogger logger = new TranslationLogger(
+            AppDirectories.logsDir().resolve("translation.log")
+        );
+
         GroqClient groq = null;
         if (!key.isEmpty()) {
             String model = System.getenv("IHUB_GROQ_MODEL");
             if (model == null || model.isBlank()) model = GroqConfig.DEFAULT_MODEL;
             groq = new HttpGroqClient(
-                new GroqConfig(GroqConfig.DEFAULT_BASE_URI, key, model, 3)
+                new GroqConfig(GroqConfig.DEFAULT_BASE_URI, key, model, 3),
+                logger::info
             );
         }
 
@@ -32,7 +37,7 @@ public final class TranslationModule {
             new GroqTranslationResponseCodec(),
             new ExternalAiPackageService(),
             new FileTranslationMaterialRepository(dir),
-            new TranslationLogger(AppDirectories.logsDir().resolve("translation.log")),
+            logger,
             dir
         );
     }
