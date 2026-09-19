@@ -33,5 +33,6 @@ class FileAlignedMaterialRepositoryTest {
         assertEquals(2, loaded.words().size());
         assertEquals("world", loaded.words().getLast().text());
         assertEquals("dtw-1", loaded.alignerVersion());
+        assertEquals(TimingSource.DTW_REFINED, loaded.timingSource());
     }
 }

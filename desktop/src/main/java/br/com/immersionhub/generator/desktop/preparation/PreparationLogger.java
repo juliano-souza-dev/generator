@@ -16,6 +16,10 @@ public final class PreparationLogger {
         append("INFO", message, null);
     }
 
+    public synchronized void warn(String message, Throwable throwable) {
+        append("WARN", message, throwable);
+    }
+
     public synchronized void error(String message, Throwable throwable) {
         append("ERROR", message, throwable);
     }

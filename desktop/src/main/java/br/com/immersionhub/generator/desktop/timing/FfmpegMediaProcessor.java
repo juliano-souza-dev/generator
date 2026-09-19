@@ -7,6 +7,7 @@ import br.com.immersionhub.generator.desktop.model.SourceMedia;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -55,6 +56,65 @@ public final class FfmpegMediaProcessor implements MediaProcessor {
             throw new IOException(error.isBlank() ? "Não foi possível gerar a waveform." : error.trim());
         }
         return reducer.reduce(pcm, points);
+    }
+
+    @Override
+    public Path preview(SourceMedia sourceMedia, Path outputDirectory) throws Exception {
+        Path dir = outputDirectory.resolve("preview").resolve(sourceMedia.sourceId());
+        Files.createDirectories(dir);
+
+        Path output = dir.resolve("preview.mp4");
+        if (Files.isRegularFile(output) && Files.size(output) > 0
+            && Files.getLastModifiedTime(output).toMillis() >= Files.getLastModifiedTime(sourceMedia.localPath()).toMillis()) {
+            return output;
+        }
+
+        Path temporary = dir.resolve("preview.tmp.mp4");
+        Files.deleteIfExists(temporary);
+
+        Path ffmpeg = ffmpegSupplier.get();
+        Process process = new ProcessBuilder(
+            previewCommand(ffmpeg, sourceMedia.localPath(), temporary)
+        ).redirectErrorStream(true).start();
+
+        ByteArrayOutputStream outputLog = new ByteArrayOutputStream();
+        try (var input = process.getInputStream()) {
+            input.transferTo(outputLog);
+        }
+        int exit = process.waitFor();
+
+        if (exit != 0 || !Files.isRegularFile(temporary) || Files.size(temporary) == 0) {
+            Files.deleteIfExists(temporary);
+            String detail = outputLog.toString(StandardCharsets.UTF_8).trim();
+            throw new IOException(detail.isEmpty() ? "Não foi possível preparar a prévia de vídeo." : detail);
+        }
+
+        try {
+            Files.move(temporary, output, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(temporary, output, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return output;
+    }
+
+    static List<String> previewCommand(Path ffmpeg, Path input, Path output) {
+        return List.of(
+            ffmpeg.toString(),
+            "-hide_banner",
+            "-loglevel", "error",
+            "-y",
+            "-i", input.toString(),
+            "-map", "0:v:0",
+            "-map", "0:a:0?",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            output.toString()
+        );
     }
 
     @Override

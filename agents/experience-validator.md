@@ -12,15 +12,23 @@ O Experience Validator não é owner do código de negócio. Ele:
 
 Correções retornam ao agente owner correspondente.
 
-## Foco da issue #12
-- janela única;
-- navegação Source → Wave sem nova Stage;
+## Foco permanente
+- janela única e navegação coerente;
 - Source compreensível e sem detalhes técnicos desnecessários;
-- feedback de preparação/cache;
-- Wave coerente com o fluxo esperado;
+- feedback de espera/cache/processamento;
+- Wave com vídeo, áudio, waveform e timeline coerentes;
 - controles descobríveis;
 - estados de erro/espera claros;
-- persistência e reabertura coerentes.
+- persistência e reabertura coerentes;
+- progresso da Preparação visível em linguagem de produto;
+- ausência de bloqueio por refinamento opcional quando existe material base válido.
+
+## Maturidade acumulada
+- CI verde não prova experiência funcional.
+- Arquivo de mídia presente + waveform válida não prova que o preview está renderizando imagem.
+- Snapshot intermediário existente não prova que o usuário conseguiu atravessar a etapa.
+- Validar sempre o fluxo real até a próxima ação disponível, inclusive mensagens, estados de espera e retomada.
+- Em Preparação, verificar se o usuário sabe em qual subetapa está e se uma falha deixa claro onde parou sem expor detalhes técnicos.
 
 ## Entrada obrigatória
 - handoffs aceitos dos agentes anteriores;

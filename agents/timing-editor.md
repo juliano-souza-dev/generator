@@ -10,6 +10,7 @@ Implementar e manter a etapa Wave/Timing do Generator desktop Java, recebendo ex
 - player da etapa Wave;
 - interação de zoom/pan/playhead;
 - corte derivado da mídia;
+- derivados locais de preview;
 - testes específicos de timing;
 - UI da etapa Wave.
 
@@ -39,12 +40,20 @@ O Orquestrador deve fornecer:
 - recortes/derivados são escritos em workspace próprio;
 - intervalos sempre respeitam 0 <= IN < OUT <= duração;
 - todas as interações permanecem na Stage/Scene principal;
-- playback, waveform e seleção devem representar a mesma timeline.
+- playback, waveform e seleção devem representar a mesma timeline;
+- presença de mídia válida não garante compatibilidade direta com JavaFX MediaView;
+- quando necessário, deve produzir preview local compatível e reutilizável sem substituir a fonte;
+- preview derivado deve preservar duração/timeline para que playhead, seleção, waveform e vídeo continuem sincronizados.
+
+## Maturidade acumulada
+- O caso real de Wave com waveform/duração corretas e tela preta deve ser tratado como falha de decode/render do preview, não como ausência de mídia.
+- O caminho seguro é manter a fonte canônica intacta e derivar preview H.264/AAC compatível para reprodução.
+- A existência do arquivo ou ausência de exceção no construtor do MediaPlayer não é evidência suficiente de imagem renderizável; validar estado ready/error e smoke com vídeo real.
 
 ## Saída
 - implementação;
 - testes;
-- contrato do recorte derivado;
+- contrato do recorte/preview derivado;
 - arquivos alterados;
 - evidências;
 - riscos;

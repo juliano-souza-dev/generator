@@ -33,10 +33,20 @@ public final class FileAlignedMaterialRepository implements AlignedMaterialRepos
                 preparedMaterial,
                 snapshot.alignerVersion,
                 words,
-                Instant.parse(snapshot.createdAt)
+                Instant.parse(snapshot.createdAt),
+                parseTimingSource(snapshot.timingSource)
             ));
         } catch (Exception ignored) {
             return Optional.empty();
+        }
+    }
+
+    private static TimingSource parseTimingSource(String value) {
+        if (value == null || value.isBlank()) return TimingSource.DTW_REFINED;
+        try {
+            return TimingSource.valueOf(value);
+        } catch (IllegalArgumentException ignored) {
+            return TimingSource.DTW_REFINED;
         }
     }
 
@@ -75,6 +85,7 @@ public final class FileAlignedMaterialRepository implements AlignedMaterialRepos
         public String preparedMaterialId;
         public String alignerVersion;
         public String createdAt;
+        public String timingSource;
         public List<Timed> words;
 
         public Snapshot() {}
@@ -85,6 +96,7 @@ public final class FileAlignedMaterialRepository implements AlignedMaterialRepos
             snapshot.preparedMaterialId = material.preparedMaterial().id();
             snapshot.alignerVersion = material.alignerVersion();
             snapshot.createdAt = material.createdAt().toString();
+            snapshot.timingSource = material.timingSource().name();
             snapshot.words = material.words().stream().map(Timed::new).toList();
             return snapshot;
         }

@@ -148,3 +148,33 @@
     -fx-font-size: 12px;
     -fx-font-weight: 600;
 }
+
+
+.project-card {
+    -fx-background-color: #111720;
+    -fx-border-color: #283241;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+.project-card-title {
+    -fx-text-fill: #f4f7fb;
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+}
+.project-card-meta {
+    -fx-text-fill: #7f8b9d;
+    -fx-font-size: 12px;
+}
+.project-card-warning {
+    -fx-text-fill: #d9b47b;
+    -fx-font-size: 12px;
+}
+.preparation-progress-log {
+    -fx-control-inner-background: #10151d;
+    -fx-background-color: #10151d;
+    -fx-text-fill: #c7d1df;
+    -fx-border-color: #2b3442;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-family: "Segoe UI";
+}

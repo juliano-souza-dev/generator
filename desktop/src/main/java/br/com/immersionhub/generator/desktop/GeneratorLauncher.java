@@ -73,6 +73,13 @@ public final class GeneratorLauncher {
         );
 
         MediaProcessor processor = TimingModule.createProcessor();
+        Path timingSmokeDir = AppDirectories.workspaceDir().resolve("timing-smoke");
+
+        Path preview = processor.preview(source, timingSmokeDir);
+        if (!Files.isRegularFile(preview) || Files.size(preview) == 0 || preview.equals(source.localPath())) {
+            throw new IllegalStateException("Timing preview smoke did not produce a reusable derived video.");
+        }
+
         var waveform = processor.waveform(source, 240);
         if (waveform.size() < 20) {
             throw new IllegalStateException("Waveform smoke test returned too few points.");
@@ -82,7 +89,7 @@ public final class GeneratorLauncher {
             source,
             250,
             1_250,
-            AppDirectories.workspaceDir().resolve("timing-smoke")
+            timingSmokeDir
         );
         if (cut.durationMs() != 1_000) {
             throw new IllegalStateException("Timing cut smoke test returned an invalid duration.");

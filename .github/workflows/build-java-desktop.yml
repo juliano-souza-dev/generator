@@ -112,8 +112,8 @@ jobs:
           & $ffmpeg -hide_banner -loglevel error -version
           if ($LASTEXITCODE -ne 0) { throw "Bundled media tool smoke test failed" }
 
-          $sample = (Join-Path (Get-Location) "target/timing-smoke-source.mp4")
-          & $ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc2=size=320x180:rate=30" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 2 -c:v libx264 -pix_fmt yuv420p -c:a aac $sample
+          $sample = (Join-Path (Get-Location) "target/timing-smoke-source.webm")
+          & $ffmpeg -hide_banner -loglevel error -y -f lavfi -i "testsrc2=size=320x180:rate=30" -f lavfi -i "sine=frequency=440:sample_rate=48000" -t 2 -c:v libvpx-vp9 -b:v 450k -c:a libopus $sample
           if ($LASTEXITCODE -ne 0) { throw "Could not create timing smoke media" }
 
           $timing = Start-Process -FilePath $exe -ArgumentList @("--timing-smoke", $sample) -PassThru -Wait
@@ -246,7 +246,7 @@ jobs:
 
           Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--smoke-test") -TimeoutSeconds 90 -Label "installed launcher smoke"
 
-          $sample = Resolve-Path "target/timing-smoke-source.mp4"
+          $sample = Resolve-Path "target/timing-smoke-source.webm"
           Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--timing-smoke", $sample) -TimeoutSeconds 120 -Label "installed timing smoke"
 
           $installedWhisper = Join-Path $installDir "app\tools\whisper\whisper-cli.exe"

@@ -4,6 +4,7 @@ import br.com.immersionhub.generator.desktop.model.MediaCut;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public final class MaterialPreparationService {
     private final TechnicalAudioExtractor audio;
@@ -19,19 +20,42 @@ public final class MaterialPreparationService {
     }
 
     public PreparedMaterial prepare(MediaCut cut) throws Exception {
+        return prepare(cut, ignored -> {});
+    }
+
+    public PreparedMaterial prepare(MediaCut cut, Consumer<PreparationStage> progress) throws Exception {
+        Consumer<PreparationStage> listener = progress == null ? ignored -> {} : progress;
         String id=PreparationIds.from(cut,pipelineVersion,asr.version());
         var cached=repository.load(id);
-        if(cached.isPresent()) return cached.get();
+        if(cached.isPresent()) {
+            PreparedMaterial stored = cached.get();
+            PreparedMaterial rebound = new PreparedMaterial(
+                stored.id(),
+                stored.pipelineVersion(),
+                stored.asrVersion(),
+                cut,
+                stored.technicalAudio(),
+                stored.transcription(),
+                stored.createdAt()
+            );
+            listener.accept(PreparationStage.TRANSCRIPTION_READY);
+            return rebound;
+        }
 
+        listener.accept(PreparationStage.PREPARING_AUDIO);
         Path dir=workspace.resolve("prepared").resolve(id);
         Path technicalAudio=audio.extract(cut,dir);
+
+        listener.accept(PreparationStage.TRANSCRIBING);
         AsrResult result=AsrTimelineNormalizer.normalize(
             asr.transcribeEnglish(technicalAudio),
             cut.durationMs()
         );
         result.validate(cut.durationMs());
+
         PreparedMaterial material=new PreparedMaterial(id,pipelineVersion,asr.version(),cut,technicalAudio,result,Instant.now());
         repository.save(material);
+        listener.accept(PreparationStage.TRANSCRIPTION_READY);
         return material;
     }
 }

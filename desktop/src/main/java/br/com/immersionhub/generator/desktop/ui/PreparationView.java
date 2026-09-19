@@ -12,8 +12,10 @@ import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.application.Platform;
 
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -26,13 +28,38 @@ public final class PreparationView {
     private final Label status = new Label("Preparando material…");
     private final Label detail = new Label("Isso pode levar alguns instantes.");
     private final ProgressIndicator progress = new ProgressIndicator();
+    private final TextArea progressLog = new TextArea();
     private final Button retry = new Button("Tentar novamente");
+    private int attempt;
 
     public PreparationView(
         MediaCut cut,
         PreparationPipeline pipeline,
         Consumer<AlignedMaterial> completedAction,
         Runnable backAction
+    ) {
+        this(cut, pipeline, completedAction, backAction, null, true, false);
+    }
+
+    public PreparationView(
+        MediaCut cut,
+        PreparationPipeline pipeline,
+        Consumer<AlignedMaterial> completedAction,
+        Runnable backAction,
+        AlignedMaterial existingMaterial,
+        boolean startAutomatically
+    ) {
+        this(cut, pipeline, completedAction, backAction, existingMaterial, startAutomatically, false);
+    }
+
+    public PreparationView(
+        MediaCut cut,
+        PreparationPipeline pipeline,
+        Consumer<AlignedMaterial> completedAction,
+        Runnable backAction,
+        AlignedMaterial existingMaterial,
+        boolean startAutomatically,
+        boolean needsRecovery
     ) {
         this.cut = Objects.requireNonNull(cut);
         this.pipeline = Objects.requireNonNull(pipeline);
@@ -59,6 +86,12 @@ public final class PreparationView {
 
         progress.setPrefSize(42, 42);
 
+        progressLog.setEditable(false);
+        progressLog.setWrapText(true);
+        progressLog.setPrefRowCount(7);
+        progressLog.setFocusTraversable(false);
+        progressLog.getStyleClass().add("preparation-progress-log");
+
         Button back = new Button("← Wave");
         back.getStyleClass().add("secondary-button");
         back.setOnAction(event -> backAction.run());
@@ -71,8 +104,32 @@ public final class PreparationView {
         HBox actions = new HBox(10, back, retry);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        root.getChildren().addAll(eyebrow, title, source, progress, status, detail, actions);
-        start();
+        root.getChildren().addAll(eyebrow, title, source, progress, status, detail, progressLog, actions);
+
+        if (existingMaterial != null) {
+            progress.setVisible(false);
+            status.setText("Material pronto.");
+            detail.setText(
+                existingMaterial.timingSource() == br.com.immersionhub.generator.desktop.preparation.TimingSource.DTW_REFINED
+                    ? "Transcrição e tempos preparados para a próxima etapa."
+                    : "Material preparado com os tempos disponíveis."
+            );
+            appendProgress("Material já preparado. Nenhum processamento foi repetido.");
+        } else if (startAutomatically) {
+            start();
+        } else {
+            progress.setVisible(false);
+            status.setText(needsRecovery ? "A preparação salva precisa ser refeita." : "Preparação pausada.");
+            detail.setText(
+                needsRecovery
+                    ? "A fonte e o recorte foram preservados. Continue para refazer somente esta etapa."
+                    : "Continue quando estiver pronto. As etapas anteriores não serão refeitas."
+            );
+            retry.setText("Continuar preparação");
+            retry.setVisible(true);
+            retry.setManaged(true);
+            appendProgress("Preparação pronta para continuar.");
+        }
     }
 
     public Parent root() {
@@ -80,6 +137,9 @@ public final class PreparationView {
     }
 
     private void start() {
+        attempt++;
+        retry.setText("Tentar novamente");
+        appendProgress((attempt == 1 ? "" : System.lineSeparator()) + "Tentativa " + attempt);
         retry.setVisible(false);
         retry.setManaged(false);
         progress.setVisible(true);
@@ -89,7 +149,10 @@ public final class PreparationView {
         Task<AlignedMaterial> task = new Task<>() {
             @Override
             protected AlignedMaterial call() throws Exception {
-                return pipeline.prepare(cut, stage -> updateMessage(stage.userMessage()));
+                return pipeline.prepare(cut, stage -> {
+                    updateMessage(stage.userMessage());
+                    Platform.runLater(() -> appendProgress(stage.userMessage()));
+                });
             }
         };
 
@@ -101,7 +164,11 @@ public final class PreparationView {
             AlignedMaterial material = task.getValue();
             progress.setVisible(false);
             status.setText("Material pronto.");
-            detail.setText("Transcrição e tempos preparados para a próxima etapa.");
+            detail.setText(
+                material.timingSource() == br.com.immersionhub.generator.desktop.preparation.TimingSource.DTW_REFINED
+                    ? "Transcrição e tempos preparados para a próxima etapa."
+                    : "Material preparado com os tempos disponíveis."
+            );
             completedAction.accept(material);
         });
 
@@ -109,6 +176,7 @@ public final class PreparationView {
             progress.setVisible(false);
             status.setText("Não foi possível preparar o material.");
             detail.setText("Tente novamente. Os detalhes técnicos foram registrados no log.");
+            appendProgress("Não foi possível concluir esta tentativa.");
             retry.setVisible(true);
             retry.setManaged(true);
         });
@@ -116,5 +184,12 @@ public final class PreparationView {
         Thread worker = new Thread(task, "material-preparation");
         worker.setDaemon(true);
         worker.start();
+    }
+
+    private void appendProgress(String message) {
+        if (message == null || message.isBlank()) return;
+        if (!progressLog.getText().isEmpty()) progressLog.appendText(System.lineSeparator());
+        progressLog.appendText(message);
+        progressLog.positionCaret(progressLog.getLength());
     }
 }

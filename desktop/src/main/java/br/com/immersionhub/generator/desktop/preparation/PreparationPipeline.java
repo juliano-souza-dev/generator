@@ -26,12 +26,26 @@ public final class PreparationPipeline {
         logger.info("prepare.start sourceId=" + cut.sourceId() + " startMs=" + cut.startMs() + " endMs=" + cut.endMs());
         try {
             listener.accept(PreparationStage.PREPARING);
-            PreparedMaterial prepared = preparation.prepare(cut);
+            PreparedMaterial prepared = preparation.prepare(cut, listener);
             logger.info("prepare.asr.ready materialId=" + prepared.id());
 
             listener.accept(PreparationStage.ALIGNING);
-            AlignedMaterial aligned = alignment.align(prepared);
-            logger.info("prepare.alignment.ready alignedId=" + aligned.id() + " words=" + aligned.words().size());
+            AlignedMaterial aligned;
+            try {
+                aligned = alignment.align(prepared);
+                if (aligned.timingSource() == TimingSource.ASR_BASE) {
+                    logger.info("prepare.alignment.cached-fallback alignedId=" + aligned.id() + " words=" + aligned.words().size());
+                    listener.accept(PreparationStage.USING_BASE_TIMINGS);
+                } else {
+                    logger.info("prepare.alignment.ready alignedId=" + aligned.id() + " words=" + aligned.words().size());
+                    listener.accept(PreparationStage.ALIGNMENT_READY);
+                }
+            } catch (Exception alignmentFailure) {
+                logger.warn("prepare.alignment.fallback materialId=" + prepared.id(), alignmentFailure);
+                aligned = alignment.fallbackToAsr(prepared);
+                listener.accept(PreparationStage.USING_BASE_TIMINGS);
+                logger.info("prepare.alignment.fallback.ready alignedId=" + aligned.id() + " words=" + aligned.words().size());
+            }
 
             listener.accept(PreparationStage.READY);
             return aligned;
