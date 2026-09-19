@@ -35,6 +35,7 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.util.Duration;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -51,6 +52,8 @@ public final class WaveView {
     private final WaveformPane waveformPane = new WaveformPane();
 
     private MediaPlayer player;
+    private StackPane playerShell;
+    private Label playerPlaceholder;
     private Boundary activeBoundary = Boundary.IN;
     private boolean selectionPlayback;
     private TextField inField;
@@ -148,6 +151,7 @@ public final class WaveView {
         root.getChildren().addAll(eyebrow, title, source, status, workspace);
         bindShortcuts();
         loadWaveform();
+        loadPreview();
 
         root.sceneProperty().addListener((obs, previous, current) -> {
             if (previous != null && current == null) dispose();
@@ -161,9 +165,44 @@ public final class WaveView {
     }
 
     private Node buildPlayer() {
+        playerPlaceholder = new Label("Preparando prévia…");
+        playerPlaceholder.getStyleClass().add("wave-placeholder");
+
+        playerShell = new StackPane(playerPlaceholder);
+        playerShell.setPrefSize(560, 315);
+        playerShell.setMinSize(560, 315);
+        playerShell.getStyleClass().add("video-shell-java");
+        return playerShell;
+    }
+
+    private void loadPreview() {
+        Task<Path> task = new Task<>() {
+            @Override
+            protected Path call() throws Exception {
+                return mediaProcessor.preview(
+                    sourceMedia,
+                    AppDirectories.workspaceDir().resolve("timing")
+                );
+            }
+        };
+
+        task.setOnSucceeded(event -> openPlayer(task.getValue()));
+        task.setOnFailed(event -> {
+            playerPlaceholder.setText("A prévia de vídeo não pôde ser aberta.");
+            status.setText(TimingFeedback.playbackFailure());
+        });
+
+        Thread worker = new Thread(task, "wave-preview");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void openPlayer(Path previewPath) {
+        disposePlayer();
         try {
-            Media media = new Media(sourceMedia.localPath().toUri().toString());
+            Media media = new Media(previewPath.toUri().toString());
             player = new MediaPlayer(media);
+
             MediaView view = new MediaView(player);
             view.setPreserveRatio(true);
             view.setFitWidth(560);
@@ -181,16 +220,26 @@ public final class WaveView {
                 }
             });
 
-            player.setOnError(() -> status.setText(TimingFeedback.playbackFailure()));
+            Runnable playbackFailure = () -> {
+                if (playerPlaceholder != null) {
+                    playerPlaceholder.setText("A prévia de vídeo não pôde ser aberta.");
+                    playerShell.getChildren().setAll(playerPlaceholder);
+                }
+                status.setText(TimingFeedback.playbackFailure());
+            };
 
-            StackPane shell = new StackPane(view);
-            shell.getStyleClass().add("video-shell-java");
-            return shell;
+            media.setOnError(playbackFailure);
+            player.setOnError(playbackFailure);
+            player.setOnReady(() -> {
+                player.seek(Duration.millis(1));
+                status.setText("Prévia pronta. Ajuste IN e OUT.");
+            });
+
+            playerShell.getChildren().setAll(view);
         } catch (Exception exception) {
-            Label fallback = new Label("A prévia de vídeo não pôde ser aberta.");
-            fallback.getStyleClass().add("wave-placeholder");
+            playerPlaceholder.setText("A prévia de vídeo não pôde ser aberta.");
+            playerShell.getChildren().setAll(playerPlaceholder);
             status.setText(TimingFeedback.playbackFailure());
-            return fallback;
         }
     }
 
@@ -551,6 +600,10 @@ public final class WaveView {
 
     private void dispose() {
         autosaveSelection();
+        disposePlayer();
+    }
+
+    private void disposePlayer() {
         if (player != null) {
             player.stop();
             player.dispose();
