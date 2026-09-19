@@ -81,12 +81,34 @@ public final class EditorialReviewService {
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Cue não encontrada na tradução."));
 
-        return updateCue(
-            material,
-            cueOrder,
+        EditorialCue current = cue(material, cueOrder);
+        List<EditorialWord> baselineWords = EditorialMaterialFactory.words(source);
+        int invalidatedGroups = (int) current.words().stream()
+            .map(EditorialWord::semanticGroupId)
+            .filter(value -> !value.isEmpty())
+            .distinct()
+            .count();
+
+        EditorialCue restored = current.withReviewAndWords(
             source.approvedEn(),
             source.pt(),
-            EditorialReviewStatus.PENDING
+            EditorialReviewStatus.PENDING,
+            baselineWords
+        );
+        EditorialWordReconciliationResult restoration = new EditorialWordReconciliationResult(
+            baselineWords,
+            0,
+            baselineWords.size(),
+            current.words().size(),
+            invalidatedGroups
+        );
+
+        return replaceCue(
+            material,
+            cueOrder,
+            restored,
+            restoration,
+            EditorialReconciliationReason.RESTORE_TRANSLATION_SUGGESTION
         );
     }
 
@@ -135,14 +157,21 @@ public final class EditorialReviewService {
             replacement = current.withReview(normalizedEn, pt, status);
         }
 
-        return replaceCue(material, cueOrder, replacement, reconciliation);
+        return replaceCue(
+            material,
+            cueOrder,
+            replacement,
+            reconciliation,
+            EditorialReconciliationReason.APPROVED_EN_EDIT
+        );
     }
 
     private EditorialMaterial replaceCue(
         EditorialMaterial material,
         int cueOrder,
         EditorialCue replacement,
-        EditorialWordReconciliationResult reconciliation
+        EditorialWordReconciliationResult reconciliation,
+        EditorialReconciliationReason reconciliationReason
     ) throws Exception {
         List<EditorialCue> cues = new ArrayList<>(material.cues());
         cues.set(cueOrder - 1, replacement);
@@ -156,7 +185,7 @@ public final class EditorialReviewService {
                 new EditorialReconciliation(
                     material.id(),
                     cueOrder,
-                    EditorialReconciliationReason.APPROVED_EN_EDIT,
+                    Objects.requireNonNull(reconciliationReason, "reconciliationReason"),
                     reconciliation.preservedWords(),
                     reconciliation.insertedWords(),
                     reconciliation.removedWords(),
