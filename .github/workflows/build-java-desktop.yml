@@ -246,7 +246,7 @@ jobs:
 
           Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--smoke-test") -TimeoutSeconds 90 -Label "installed launcher smoke"
 
-          $sample = Resolve-Path "target/timing-smoke-source.mp4"
+          $sample = Resolve-Path "target/timing-smoke-source.webm"
           Invoke-BoundedProcess -FilePath $installedExe -Arguments @("--timing-smoke", $sample) -TimeoutSeconds 120 -Label "installed timing smoke"
 
           $installedWhisper = Join-Path $installDir "app\tools\whisper\whisper-cli.exe"
