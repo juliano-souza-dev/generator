@@ -77,7 +77,7 @@ class ProjectRepositoryTest {
 
         Path json = repository.projectDirectory(state.projectId()).resolve("project.json");
         String legacy = Files.readString(json).replace(
-            "\"schemaVersion\" : 1",
+            "\"schemaVersion\" : " + ProjectState.CURRENT_SCHEMA_VERSION,
             "\"schemaVersion\" : 0"
         );
         Files.writeString(json, legacy);
@@ -85,6 +85,51 @@ class ProjectRepositoryTest {
         ProjectState loaded = repository.list().projects().getFirst();
         assertEquals(ProjectState.CURRENT_SCHEMA_VERSION, loaded.schemaVersion());
         assertEquals(ProjectStage.WAVE, loaded.minimumResumeStage());
+    }
+
+    @Test
+    void migratesCompletedPreparationFromV1ToTranslationStage() throws Exception {
+        Path dir = Files.createTempDirectory("project-v1-translation");
+        SourceMedia source = source(dir, "source-v1", "Projeto V1");
+        MediaCut cut = cut(dir, source, 0, 1000);
+
+        Path audio = Files.writeString(dir.resolve("audio.wav"), "a");
+        br.com.immersionhub.generator.desktop.preparation.AsrResult transcript =
+            new br.com.immersionhub.generator.desktop.preparation.AsrResult(
+                "en",
+                "hello",
+                java.util.List.of(new br.com.immersionhub.generator.desktop.preparation.TimedText("hello", 0, 1000)),
+                java.util.List.of(new br.com.immersionhub.generator.desktop.preparation.TimedText("hello", 0, 1000))
+            );
+        br.com.immersionhub.generator.desktop.preparation.PreparedMaterial prepared =
+            new br.com.immersionhub.generator.desktop.preparation.PreparedMaterial(
+                "prepared-v1", "pipeline", "asr", cut, audio, transcript, Instant.EPOCH
+            );
+        br.com.immersionhub.generator.desktop.preparation.AlignedMaterial aligned =
+            new br.com.immersionhub.generator.desktop.preparation.AlignedMaterial(
+                "aligned-v1",
+                prepared,
+                "dtw",
+                transcript.words(),
+                Instant.EPOCH,
+                br.com.immersionhub.generator.desktop.preparation.TimingSource.DTW_REFINED
+            );
+
+        ProjectRepository repository = new ProjectRepository(dir.resolve("projects"));
+        ProjectState current = ProjectState.start(source).withCut(cut).withPrepared(aligned);
+        repository.save(current);
+
+        Path json = repository.projectDirectory(current.projectId()).resolve("project.json");
+        String legacy = Files.readString(json)
+            .replace("\"schemaVersion\" : 2", "\"schemaVersion\" : 1")
+            .replace("\"currentStage\" : \"TRANSLATION\"", "\"currentStage\" : \"PREPARATION\"");
+        Files.writeString(json, legacy);
+
+        ProjectState loaded = repository.list().projects().getFirst();
+        assertEquals(ProjectStage.TRANSLATION, loaded.currentStage());
+        assertEquals(ProjectStage.TRANSLATION, loaded.minimumResumeStage());
+        assertTrue(loaded.preparationCompleted());
+        assertFalse(loaded.translationCompleted());
     }
 
     @Test
