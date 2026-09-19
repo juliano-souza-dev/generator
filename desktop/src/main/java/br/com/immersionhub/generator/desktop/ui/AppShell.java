@@ -82,7 +82,7 @@ public final class AppShell {
 
     public void show(Node content, ScreenId screen) {
         root.setCenter(content);
-        sectionLabel.setText(screen.name());
+        sectionLabel.setText(screen == ScreenId.EDITORIAL_REVIEW ? "REVIEW" : screen.name());
         setActive(homeButton, screen == ScreenId.HOME);
         setActive(sourceButton, screen == ScreenId.SOURCE);
         setActive(waveButton, screen == ScreenId.WAVE);
