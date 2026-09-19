@@ -17,7 +17,15 @@ Executar a regressão final da entrega aceita pelos agentes anteriores.
 - validar instalação/abertura/desinstalação;
 - validar persistência que deve sobreviver;
 - verificar contratos congelados;
-- conferir que não há regressão conhecida não registrada.
+- conferir que não há regressão conhecida não registrada;
+- diferenciar teste unitário de evidência de fluxo real;
+- para mídia/player, exigir smoke com arquivo que exercite decode/render e não apenas existência do arquivo;
+- para Preparação, exigir cenário de refinamento bem-sucedido e cenário de fallback não bloqueante.
+
+## Maturidade acumulada
+- Builds anteriores passaram CI enquanto o teste real encontrou tela preta e bloqueios sucessivos na Preparação.
+- Portanto, regressões devem reproduzir os formatos/limites encontrados em campo sempre que possível.
+- Instalador verde não substitui validação do comportamento funcional que motivou a correção.
 
 ## Não faz
 - redesign;
