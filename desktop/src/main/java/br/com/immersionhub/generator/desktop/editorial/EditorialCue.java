@@ -40,6 +40,15 @@ public record EditorialCue(
     }
 
     public EditorialCue withReview(String nextApprovedEn, String nextPt, EditorialReviewStatus nextStatus) {
+        return withReviewAndWords(nextApprovedEn, nextPt, nextStatus, words);
+    }
+
+    public EditorialCue withReviewAndWords(
+        String nextApprovedEn,
+        String nextPt,
+        EditorialReviewStatus nextStatus,
+        List<EditorialWord> nextWords
+    ) {
         return new EditorialCue(
             order,
             speechStartMs,
@@ -51,7 +60,7 @@ public record EditorialCue(
             nextApprovedEn,
             nextPt,
             Objects.requireNonNull(nextStatus, "nextStatus"),
-            words
+            nextWords
         );
     }
 

@@ -7,8 +7,8 @@ public record EditorialWord(
     String originalEn,
     String approvedEn,
     String pt,
-    long startMs,
-    long endMs,
+    Long startMs,
+    Long endMs,
     Double confidence,
     String semanticGroupId,
     SemanticGroupRole semanticGroupRole,
@@ -16,10 +16,20 @@ public record EditorialWord(
 ) {
     public EditorialWord {
         if (index <= 0) throw new IllegalArgumentException("index inválido.");
-        originalEn = requireText(originalEn, "originalEn");
+
+        originalEn = originalEn == null ? "" : originalEn.trim();
         approvedEn = requireText(approvedEn, "approvedEn");
         pt = pt == null ? "" : pt.trim();
-        if (startMs < 0 || endMs <= startMs) throw new IllegalArgumentException("Timing de word inválido.");
+
+        if ((startMs == null) != (endMs == null)) {
+            throw new IllegalArgumentException("Timing de word deve estar completo ou ausente.");
+        }
+        if (startMs != null && (startMs < 0 || endMs <= startMs)) {
+            throw new IllegalArgumentException("Timing de word inválido.");
+        }
+        if (startMs == null && confidence != null) {
+            throw new IllegalArgumentException("Word sem timing não pode herdar confidence.");
+        }
         if (confidence != null && (confidence.isNaN() || confidence < 0d || confidence > 1d)) {
             throw new IllegalArgumentException("Confidence inválida.");
         }
@@ -34,6 +44,10 @@ public record EditorialWord(
         if (semanticGroupRole != SemanticGroupRole.NONE && semanticGroupId.isEmpty()) {
             throw new IllegalArgumentException("Word agrupada deve possuir semanticGroupId.");
         }
+    }
+
+    public boolean timed() {
+        return startMs != null && endMs != null;
     }
 
     private static String requireText(String value, String field) {

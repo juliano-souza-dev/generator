@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 final class EditorialDocumentCodec {
     private final ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
@@ -36,33 +38,73 @@ final class EditorialDocumentCodec {
                 || editorial.subtitleEndMs() != translated.subtitleEndMs()
                 || !editorial.speaker().equals(translated.speaker())
                 || !editorial.originalEn().equals(translated.originalEn())) {
-                throw new IllegalArgumentException("A revisão alterou campos protegidos da cue " + editorial.order() + ".");
+                throw new IllegalArgumentException(
+                    "A revisão alterou campos protegidos da cue " + editorial.order() + "."
+                );
             }
 
-            if (editorial.words().size() != translated.words().size()) {
-                throw new IllegalArgumentException("A revisão alterou words protegidas da cue " + editorial.order() + ".");
-            }
-            for (int wordIndex = 0; wordIndex < editorial.words().size(); wordIndex++) {
-                EditorialWord editorialWord = editorial.words().get(wordIndex);
-                var translatedWord = translated.words().get(wordIndex);
-                if (editorialWord.index() != wordIndex + 1
-                    || !editorialWord.originalEn().equals(translatedWord.text())
-                    || !editorialWord.approvedEn().equals(translatedWord.text())
-                    || !editorialWord.pt().isEmpty()
-                    || editorialWord.startMs() != translatedWord.startMs()
-                    || editorialWord.endMs() != translatedWord.endMs()
-                    || !java.util.Objects.equals(editorialWord.confidence(), translatedWord.confidence())
-                    || !editorialWord.semanticGroupId().isEmpty()
-                    || editorialWord.semanticGroupRole() != SemanticGroupRole.NONE
-                    || editorialWord.reviewStatus() != EditorialReviewStatus.PENDING) {
-                    throw new IllegalArgumentException(
-                        "A revisão de cues alterou words protegidas da cue " + editorial.order() + "."
-                    );
-                }
-            }
+            validateWordSequence(editorial);
+            validateWordOrigins(editorial, translated.words());
         }
 
         return material;
+    }
+
+    private static void validateWordSequence(EditorialCue cue) {
+        List<String> tokens = EditorialWordReconciler.tokens(cue.approvedEn());
+        if (tokens.size() != cue.words().size()) {
+            throw new IllegalArgumentException(
+                "Words não correspondem ao English aprovado da cue " + cue.order() + "."
+            );
+        }
+
+        for (int index = 0; index < tokens.size(); index++) {
+            String expected = EditorialWordReconciler.normalizedToken(tokens.get(index));
+            String actual = EditorialWordReconciler.normalizedToken(cue.words().get(index).approvedEn());
+            if (!expected.equals(actual)) {
+                throw new IllegalArgumentException(
+                    "Ordem de words não corresponde ao English aprovado da cue " + cue.order() + "."
+                );
+            }
+        }
+    }
+
+    private static void validateWordOrigins(
+        EditorialCue cue,
+        List<br.com.immersionhub.generator.desktop.preparation.TimedText> translatedWords
+    ) {
+        boolean[] used = new boolean[translatedWords.size()];
+
+        for (EditorialWord word : cue.words()) {
+            if (!word.timed()) {
+                if (!word.originalEn().isEmpty() || word.confidence() != null) {
+                    throw new IllegalArgumentException(
+                        "Word reconciliada herdou metadado automático inválido na cue " + cue.order() + "."
+                    );
+                }
+                continue;
+            }
+
+            boolean found = false;
+            for (int index = 0; index < translatedWords.size(); index++) {
+                if (used[index]) continue;
+                var original = translatedWords.get(index);
+                if (word.originalEn().equals(original.text())
+                    && word.startMs().longValue() == original.startMs()
+                    && word.endMs().longValue() == original.endMs()
+                    && Objects.equals(word.confidence(), original.confidence())) {
+                    used[index] = true;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                throw new IllegalArgumentException(
+                    "Word reconciliada herdou timing que não pertence à tradução na cue " + cue.order() + "."
+                );
+            }
+        }
     }
 
     static final class Document {
@@ -70,6 +112,7 @@ final class EditorialDocumentCodec {
         public String translationMaterialId;
         public String schemaVersion;
         public List<CueDocument> cues;
+        public List<ReconciliationDocument> reconciliations;
         public String createdAt;
 
         public Document() {}
@@ -80,17 +123,61 @@ final class EditorialDocumentCodec {
             document.translationMaterialId = material.translationMaterialId();
             document.schemaVersion = material.schemaVersion();
             document.cues = material.cues().stream().map(CueDocument::from).toList();
+            document.reconciliations = material.reconciliations().stream()
+                .map(ReconciliationDocument::from)
+                .toList();
             document.createdAt = material.createdAt().toString();
             return document;
         }
 
         EditorialMaterial toMaterial() {
+            List<EditorialReconciliation> history = reconciliations == null
+                ? List.of()
+                : reconciliations.stream().map(ReconciliationDocument::toReconciliation).toList();
+
             return new EditorialMaterial(
                 id,
                 translationMaterialId,
                 schemaVersion,
                 cues.stream().map(CueDocument::toCue).toList(),
+                history,
                 Instant.parse(createdAt)
+            );
+        }
+    }
+
+    static final class ReconciliationDocument {
+        public String sourceMaterialId;
+        public int cueOrder;
+        public String reason;
+        public int preservedWords;
+        public int insertedWords;
+        public int removedWords;
+        public int invalidatedGroups;
+
+        public ReconciliationDocument() {}
+
+        static ReconciliationDocument from(EditorialReconciliation reconciliation) {
+            ReconciliationDocument document = new ReconciliationDocument();
+            document.sourceMaterialId = reconciliation.sourceMaterialId();
+            document.cueOrder = reconciliation.cueOrder();
+            document.reason = reconciliation.reason().name();
+            document.preservedWords = reconciliation.preservedWords();
+            document.insertedWords = reconciliation.insertedWords();
+            document.removedWords = reconciliation.removedWords();
+            document.invalidatedGroups = reconciliation.invalidatedGroups();
+            return document;
+        }
+
+        EditorialReconciliation toReconciliation() {
+            return new EditorialReconciliation(
+                sourceMaterialId,
+                cueOrder,
+                EditorialReconciliationReason.valueOf(reason),
+                preservedWords,
+                insertedWords,
+                removedWords,
+                invalidatedGroups
             );
         }
     }
@@ -148,8 +235,8 @@ final class EditorialDocumentCodec {
         public String originalEn;
         public String approvedEn;
         public String pt;
-        public long startMs;
-        public long endMs;
+        public Long startMs;
+        public Long endMs;
         public Double confidence;
         public String semanticGroupId;
         public String semanticGroupRole;

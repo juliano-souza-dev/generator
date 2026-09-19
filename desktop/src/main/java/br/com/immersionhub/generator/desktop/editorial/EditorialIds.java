@@ -13,6 +13,15 @@ final class EditorialIds {
         String schemaVersion,
         List<EditorialCue> cues
     ) {
+        return materialId(translationMaterialId, schemaVersion, cues, List.of());
+    }
+
+    static String materialId(
+        String translationMaterialId,
+        String schemaVersion,
+        List<EditorialCue> cues,
+        List<EditorialReconciliation> reconciliations
+    ) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             update(digest, "immersionhub-editorial-material");
@@ -36,13 +45,24 @@ final class EditorialIds {
                     update(digest, word.originalEn());
                     update(digest, word.approvedEn());
                     update(digest, word.pt());
-                    update(digest, Long.toString(word.startMs()));
-                    update(digest, Long.toString(word.endMs()));
+                    update(digest, word.startMs() == null ? "" : Long.toString(word.startMs()));
+                    update(digest, word.endMs() == null ? "" : Long.toString(word.endMs()));
                     update(digest, word.confidence() == null ? "" : word.confidence().toString());
                     update(digest, word.semanticGroupId());
                     update(digest, word.semanticGroupRole().name());
                     update(digest, word.reviewStatus().name());
                 }
+            }
+
+            for (EditorialReconciliation reconciliation : reconciliations) {
+                update(digest, "reconciliation");
+                update(digest, reconciliation.sourceMaterialId());
+                update(digest, Integer.toString(reconciliation.cueOrder()));
+                update(digest, reconciliation.reason().name());
+                update(digest, Integer.toString(reconciliation.preservedWords()));
+                update(digest, Integer.toString(reconciliation.insertedWords()));
+                update(digest, Integer.toString(reconciliation.removedWords()));
+                update(digest, Integer.toString(reconciliation.invalidatedGroups()));
             }
 
             return HexFormat.of().formatHex(digest.digest());
