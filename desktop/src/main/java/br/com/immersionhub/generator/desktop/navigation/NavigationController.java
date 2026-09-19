@@ -34,6 +34,7 @@ public final class NavigationController {
     private MediaCut mediaCut;
     private AlignedMaterial alignedMaterial;
     private boolean preparationAutoStart;
+    private boolean preparationNeedsRecovery;
 
     public NavigationController() {
         state.onChanged(this::render);
@@ -71,6 +72,7 @@ public final class NavigationController {
         mediaCut = null;
         alignedMaterial = null;
         preparationAutoStart = false;
+        preparationNeedsRecovery = false;
         refreshNavigationAvailability();
         state.navigate(ScreenId.SOURCE);
     }
@@ -86,8 +88,18 @@ public final class NavigationController {
                 mediaCut
             ).orElse(null)
             : null;
-        preparationAutoStart = false;
 
+        preparationNeedsRecovery = project.preparationCompleted()
+            && mediaCut != null
+            && alignedMaterial == null;
+
+        if (preparationNeedsRecovery) {
+            ProjectState recovered = project.withoutPreparation();
+            persist(recovered);
+            projectState = recovered;
+        }
+
+        preparationAutoStart = false;
         refreshNavigationAvailability();
 
         ProjectStage resume = project.minimumResumeStage();
@@ -120,6 +132,7 @@ public final class NavigationController {
 
         sourceMedia = media;
         preparationAutoStart = false;
+        preparationNeedsRecovery = false;
         refreshNavigationAvailability();
         state.navigate(ScreenId.WAVE);
     }
@@ -129,6 +142,7 @@ public final class NavigationController {
         mediaCut = null;
         alignedMaterial = null;
         preparationAutoStart = false;
+        preparationNeedsRecovery = false;
         refreshNavigationAvailability();
     }
 
@@ -144,6 +158,7 @@ public final class NavigationController {
         mediaCut = cut;
         alignedMaterial = null;
         preparationAutoStart = true;
+        preparationNeedsRecovery = false;
         refreshNavigationAvailability();
         state.navigate(ScreenId.PREPARATION);
     }
@@ -159,6 +174,7 @@ public final class NavigationController {
         projectState = next;
         alignedMaterial = material;
         preparationAutoStart = false;
+        preparationNeedsRecovery = false;
         refreshNavigationAvailability();
     }
 
@@ -240,7 +256,8 @@ public final class NavigationController {
                     this::acceptPrepared,
                     () -> state.navigate(ScreenId.WAVE),
                     alignedMaterial,
-                    autoStart
+                    autoStart,
+                    preparationNeedsRecovery
                 ).root();
             }
         }
