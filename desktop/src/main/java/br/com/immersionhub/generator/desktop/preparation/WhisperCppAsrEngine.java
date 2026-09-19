@@ -84,7 +84,7 @@ public final class WhisperCppAsrEngine implements AsrEngine {
                     String tokenText = token.path("text").asText("").trim();
                     long wordStart = offsetMs(token, "from");
                     long wordEnd = offsetMs(token, "to");
-                    if (!tokenText.isEmpty() && wordEnd > wordStart) {
+                    if (!tokenText.isEmpty() && !isSpecialToken(tokenText) && wordEnd > wordStart) {
                         Double confidence = token.path("p").isNumber() ? token.path("p").asDouble() : null;
                         words.add(new TimedText(tokenText, wordStart, wordEnd, confidence));
                     }
@@ -96,5 +96,9 @@ public final class WhisperCppAsrEngine implements AsrEngine {
 
     static long offsetMs(JsonNode node, String side) {
         return node.path("offsets").path(side).asLong(-1);
+    }
+
+    private static boolean isSpecialToken(String text) {
+        return text.startsWith("[_") && text.endsWith("]");
     }
 }
