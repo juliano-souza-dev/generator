@@ -8,5 +8,10 @@ import java.util.List;
 
 public interface MediaProcessor {
     List<Double> waveform(SourceMedia sourceMedia, int points) throws Exception;
+
+    default Path preview(SourceMedia sourceMedia, Path outputDirectory) throws Exception {
+        return sourceMedia.localPath();
+    }
+
     MediaCut cut(SourceMedia sourceMedia, long startMs, long endMs, Path outputDirectory) throws Exception;
 }
