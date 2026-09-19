@@ -1,35 +1,19 @@
 package br.com.immersionhub.generator.desktop.translation;
 
 import br.com.immersionhub.generator.desktop.infrastructure.AppDirectories;
+import com.sun.jna.platform.win32.Crypt32Util;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 public final class WindowsDpapiGroqCredentialStore implements GroqCredentialStore {
-    private static final String PROTECT_SCRIPT = """
-        $payload = [Console]::In.ReadToEnd()
-        $secure = ConvertTo-SecureString -String $payload -AsPlainText -Force
-        [Console]::Out.Write((ConvertFrom-SecureString -SecureString $secure))
-        """;
-
-    private static final String UNPROTECT_SCRIPT = """
-        $payload = [Console]::In.ReadToEnd().Trim()
-        $secure = ConvertTo-SecureString -String $payload
-        $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-        try {
-            [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer))
-        } finally {
-            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
-        }
-        """;
-
     private final Path credentialFile;
 
     public WindowsDpapiGroqCredentialStore() {
@@ -45,11 +29,17 @@ public final class WindowsDpapiGroqCredentialStore implements GroqCredentialStor
         if (!Files.isRegularFile(credentialFile)) return Optional.empty();
         ensureWindows();
 
-        String encrypted = Files.readString(credentialFile, StandardCharsets.UTF_8).trim();
-        if (encrypted.isEmpty()) return Optional.empty();
+        String encoded = Files.readString(credentialFile, StandardCharsets.UTF_8).trim();
+        if (encoded.isEmpty()) return Optional.empty();
 
-        String key = powershell(UNPROTECT_SCRIPT, encrypted).trim();
-        return key.isEmpty() ? Optional.empty() : Optional.of(key);
+        byte[] encrypted = Base64.getDecoder().decode(encoded);
+        byte[] plaintext = Crypt32Util.cryptUnprotectData(encrypted);
+        try {
+            String key = new String(plaintext, StandardCharsets.UTF_8).trim();
+            return key.isEmpty() ? Optional.empty() : Optional.of(key);
+        } finally {
+            Arrays.fill(plaintext, (byte) 0);
+        }
     }
 
     @Override
@@ -58,11 +48,16 @@ public final class WindowsDpapiGroqCredentialStore implements GroqCredentialStor
         if (normalized.isEmpty()) throw new IllegalArgumentException("Chave Groq não informada.");
         ensureWindows();
 
-        Files.createDirectories(credentialFile.getParent());
-        String protectedValue = powershell(PROTECT_SCRIPT, normalized).trim();
-        if (protectedValue.isEmpty()) {
-            throw new IOException("Não foi possível proteger a configuração da Groq.");
+        byte[] plaintext = normalized.getBytes(StandardCharsets.UTF_8);
+        byte[] encrypted;
+        try {
+            encrypted = Crypt32Util.cryptProtectData(plaintext);
+        } finally {
+            Arrays.fill(plaintext, (byte) 0);
         }
+
+        Files.createDirectories(credentialFile.getParent());
+        String protectedValue = Base64.getEncoder().encodeToString(encrypted);
 
         Path temporary = credentialFile.resolveSibling(credentialFile.getFileName() + ".tmp");
         Files.writeString(temporary, protectedValue, StandardCharsets.UTF_8);
@@ -90,34 +85,5 @@ public final class WindowsDpapiGroqCredentialStore implements GroqCredentialStor
                 "A configuração persistente da Groq está disponível no aplicativo Windows."
             );
         }
-    }
-
-    private static String powershell(String script, String stdin) throws Exception {
-        Process process = new ProcessBuilder(
-            "powershell.exe",
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            script
-        ).start();
-
-        try (var output = process.getOutputStream()) {
-            output.write(stdin.getBytes(StandardCharsets.UTF_8));
-        }
-
-        boolean finished = process.waitFor(20, TimeUnit.SECONDS);
-        if (!finished) {
-            process.destroyForcibly();
-            throw new IOException("Tempo esgotado ao proteger a configuração da Groq.");
-        }
-
-        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (process.exitValue() != 0) {
-            throw new IOException("Não foi possível acessar a configuração protegida da Groq.");
-        }
-        return stdout;
     }
 }
