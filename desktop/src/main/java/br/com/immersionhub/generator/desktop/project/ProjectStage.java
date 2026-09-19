@@ -4,7 +4,8 @@ public enum ProjectStage {
     SOURCE("Source"),
     WAVE("Wave"),
     PREPARATION("Preparação"),
-    TRANSLATION("Tradução");
+    TRANSLATION("Tradução"),
+    EDITORIAL_REVIEW("Revisão");
 
     private final String userLabel;
 

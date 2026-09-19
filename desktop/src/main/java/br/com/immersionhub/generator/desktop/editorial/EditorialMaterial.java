@@ -38,11 +38,21 @@ public record EditorialMaterial(
         }
     }
 
+    public boolean cuesApproved() {
+        return cues.stream().allMatch(cue -> cue.reviewStatus() == EditorialReviewStatus.APPROVED);
+    }
+
     public boolean fullyApproved() {
-        return cues.stream().allMatch(cue ->
-            cue.reviewStatus() == EditorialReviewStatus.APPROVED
-                && cue.words().stream().allMatch(word -> word.reviewStatus() == EditorialReviewStatus.APPROVED)
-        );
+        return cuesApproved()
+            && cues.stream().allMatch(cue ->
+                cue.words().stream().allMatch(word -> word.reviewStatus() == EditorialReviewStatus.APPROVED)
+            );
+    }
+
+    public EditorialMaterial withCues(List<EditorialCue> updatedCues) {
+        List<EditorialCue> copy = List.copyOf(Objects.requireNonNull(updatedCues, "updatedCues"));
+        String nextId = EditorialIds.materialId(translationMaterialId, schemaVersion, copy);
+        return new EditorialMaterial(nextId, translationMaterialId, schemaVersion, copy, createdAt);
     }
 
     public static EditorialMaterial create(

@@ -39,6 +39,22 @@ public record EditorialCue(
         }
     }
 
+    public EditorialCue withReview(String nextApprovedEn, String nextPt, EditorialReviewStatus nextStatus) {
+        return new EditorialCue(
+            order,
+            speechStartMs,
+            speechEndMs,
+            subtitleStartMs,
+            subtitleEndMs,
+            speaker,
+            originalEn,
+            nextApprovedEn,
+            nextPt,
+            Objects.requireNonNull(nextStatus, "nextStatus"),
+            words
+        );
+    }
+
     private static String requireText(String value, String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) throw new IllegalArgumentException(field + " não pode ser vazio.");

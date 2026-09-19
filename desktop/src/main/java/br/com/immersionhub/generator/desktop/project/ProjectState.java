@@ -37,7 +37,7 @@ public record ProjectState(
     Instant createdAt,
     Instant updatedAt
 ) {
-    public static final int CURRENT_SCHEMA_VERSION = 2;
+    public static final int CURRENT_SCHEMA_VERSION = 3;
 
     public ProjectState {
         if (schemaVersion <= 0) schemaVersion = CURRENT_SCHEMA_VERSION;
@@ -112,9 +112,21 @@ public record ProjectState(
             CURRENT_SCHEMA_VERSION, projectId, title,
             sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
             cutStartMs, cutEndMs, cutPath, cutCreatedAt,
-            ProjectStage.TRANSLATION, completed,
+            ProjectStage.EDITORIAL_REVIEW, completed,
             preparedMaterialId, alignedMaterialId,
             material.id(), material.source().name(),
+            createdAt, Instant.now()
+        );
+    }
+
+    public ProjectState withEditorialActivity() {
+        return new ProjectState(
+            CURRENT_SCHEMA_VERSION, projectId, title,
+            sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
+            cutStartMs, cutEndMs, cutPath, cutCreatedAt,
+            ProjectStage.EDITORIAL_REVIEW, completedStages,
+            preparedMaterialId, alignedMaterialId,
+            translationMaterialId, translationSource,
             createdAt, Instant.now()
         );
     }
@@ -124,6 +136,7 @@ public record ProjectState(
         completed.addAll(completedStages);
         completed.remove(ProjectStage.PREPARATION);
         completed.remove(ProjectStage.TRANSLATION);
+        completed.remove(ProjectStage.EDITORIAL_REVIEW);
         return new ProjectState(
             CURRENT_SCHEMA_VERSION, projectId, title,
             sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
@@ -137,6 +150,7 @@ public record ProjectState(
         Set<ProjectStage> completed = EnumSet.noneOf(ProjectStage.class);
         completed.addAll(completedStages);
         completed.remove(ProjectStage.TRANSLATION);
+        completed.remove(ProjectStage.EDITORIAL_REVIEW);
         return new ProjectState(
             CURRENT_SCHEMA_VERSION, projectId, title,
             sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
@@ -182,6 +196,7 @@ public record ProjectState(
         try {
             Path output = Path.of(cutPath).toAbsolutePath().normalize();
             if (!Files.isRegularFile(output)) return Optional.empty();
+
             return Optional.of(new MediaCut(
                 sourceId, source.get().localPath(), output,
                 cutStartMs, cutEndMs, cutEndMs - cutStartMs, Instant.parse(cutCreatedAt)
@@ -216,7 +231,8 @@ public record ProjectState(
         if (currentStage == ProjectStage.SOURCE) return ProjectStage.SOURCE;
         if (mediaCut().isEmpty()) return ProjectStage.WAVE;
         if (!preparationCompleted()) return ProjectStage.PREPARATION;
-        return ProjectStage.TRANSLATION;
+        if (!translationCompleted()) return ProjectStage.TRANSLATION;
+        return ProjectStage.EDITORIAL_REVIEW;
     }
 
     public String recoveryMessage() {
