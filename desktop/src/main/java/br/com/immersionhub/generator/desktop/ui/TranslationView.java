@@ -6,7 +6,6 @@ import br.com.immersionhub.generator.desktop.translation.TranslationMaterial;
 import br.com.immersionhub.generator.desktop.translation.TranslationModule;
 import br.com.immersionhub.generator.desktop.translation.TranslationOutcome;
 import br.com.immersionhub.generator.desktop.translation.TranslationService;
-import br.com.immersionhub.generator.desktop.translation.TranslationStage;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -14,7 +13,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.PasswordField;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
@@ -24,6 +22,7 @@ import javafx.stage.FileChooser;
 import java.awt.Desktop;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 public final class TranslationView {
@@ -31,12 +30,12 @@ public final class TranslationView {
     private final String projectId;
     private final AlignedMaterial aligned;
     private final Consumer<TranslationMaterial> completedAction;
+    private final BooleanSupplier configureGroq;
 
     private final Label status = new Label("Preparando tradução…");
     private final Label detail = new Label("O pacote externo ficará disponível independentemente da tradução automática.");
     private final ProgressIndicator progress = new ProgressIndicator();
     private final TextArea progressLog = new TextArea();
-    private final PasswordField apiKey = new PasswordField();
     private final Button translate = new Button("Traduzir com Groq");
     private final Button openPackage = new Button("Abrir pacote externo");
     private final Button importExternal = new Button("Importar retorno externo");
@@ -50,11 +49,13 @@ public final class TranslationView {
         AlignedMaterial aligned,
         TranslationMaterial existingTranslation,
         Consumer<TranslationMaterial> completedAction,
-        Runnable backAction
+        Runnable backAction,
+        BooleanSupplier configureGroq
     ) {
         this.projectId = Objects.requireNonNull(projectId);
         this.aligned = Objects.requireNonNull(aligned);
         this.completedAction = Objects.requireNonNull(completedAction);
+        this.configureGroq = Objects.requireNonNull(configureGroq);
         this.translatedMaterial = existingTranslation;
 
         root.setPadding(new Insets(28, 34, 28, 34));
@@ -86,12 +87,6 @@ public final class TranslationView {
         progressLog.setFocusTraversable(false);
         progressLog.getStyleClass().add("preparation-progress-log");
 
-        apiKey.setPromptText("Chave Groq para esta sessão");
-        apiKey.getStyleClass().add("source-field");
-        apiKey.setPrefWidth(420);
-        apiKey.setManaged(!TranslationModule.environmentKeyAvailable());
-        apiKey.setVisible(!TranslationModule.environmentKeyAvailable());
-
         translate.getStyleClass().add("primary-button");
         openPackage.getStyleClass().add("secondary-button");
         importExternal.getStyleClass().add("secondary-button");
@@ -110,7 +105,7 @@ public final class TranslationView {
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         root.getChildren().addAll(
-            eyebrow, title, copy, apiKey, progress, status, detail, progressLog, actions
+            eyebrow, title, copy, progress, status, detail, progressLog, actions
         );
 
         if (existingTranslation != null && existingTranslation.complete()) {
@@ -174,10 +169,13 @@ public final class TranslationView {
             return;
         }
 
-        String key = apiKey.getText() == null ? "" : apiKey.getText().trim();
-        if (!TranslationModule.environmentKeyAvailable() && key.isEmpty()) {
-            status.setText("Informe sua chave Groq para esta sessão.");
-            return;
+        if (!TranslationModule.hasApiKey()) {
+            boolean configured = configureGroq.getAsBoolean();
+            if (!configured || !TranslationModule.hasApiKey()) {
+                status.setText("Configure sua chave Groq para continuar.");
+                detail.setText("A chave é configurada uma única vez e vale para todos os projetos.");
+                return;
+            }
         }
 
         translate.setDisable(true);
@@ -185,7 +183,7 @@ public final class TranslationView {
         progress.setVisible(true);
         appendProgress("Iniciando tradução…");
 
-        TranslationService service = TranslationModule.createService(projectId, key);
+        TranslationService service = TranslationModule.createService(projectId);
         Task<TranslationOutcome> task = new Task<>() {
             @Override
             protected TranslationOutcome call() throws Exception {
@@ -222,11 +220,18 @@ public final class TranslationView {
 
         task.setOnFailed(event -> {
             progress.setVisible(false);
-            status.setText("Não foi possível concluir a tradução.");
-            detail.setText("O pacote externo continua disponível.");
             translate.setDisable(false);
             importExternal.setDisable(false);
             appendProgress("A tradução automática foi interrompida.");
+
+            if (TranslationModule.authenticationFailure(task.getException())) {
+                status.setText("Sua chave Groq precisa ser atualizada.");
+                detail.setText("Abra a configuração, valide uma nova chave e tente novamente.");
+                configureGroq.getAsBoolean();
+            } else {
+                status.setText("Não foi possível concluir a tradução.");
+                detail.setText("O pacote externo continua disponível.");
+            }
         });
 
         Thread worker = new Thread(task, "groq-translation");
@@ -255,7 +260,7 @@ public final class TranslationView {
         Task<TranslationMaterial> task = new Task<>() {
             @Override
             protected TranslationMaterial call() throws Exception {
-                return TranslationModule.createService(projectId, "")
+                return TranslationModule.createService(projectId)
                     .importExternal(selected.toPath(), baseMaterial);
             }
         };

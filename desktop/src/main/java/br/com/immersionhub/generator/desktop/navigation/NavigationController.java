@@ -16,6 +16,7 @@ import br.com.immersionhub.generator.desktop.timing.TimingModule;
 import br.com.immersionhub.generator.desktop.translation.TranslationMaterial;
 import br.com.immersionhub.generator.desktop.translation.TranslationModule;
 import br.com.immersionhub.generator.desktop.ui.AppShell;
+import br.com.immersionhub.generator.desktop.ui.GroqSettingsDialog;
 import br.com.immersionhub.generator.desktop.ui.HomeView;
 import br.com.immersionhub.generator.desktop.ui.PreparationView;
 import br.com.immersionhub.generator.desktop.ui.SourceView;
@@ -23,6 +24,7 @@ import br.com.immersionhub.generator.desktop.ui.TranslationView;
 import br.com.immersionhub.generator.desktop.ui.WaveView;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.stage.Window;
 
 public final class NavigationController {
     private final NavigationState state = new NavigationState();
@@ -58,6 +60,7 @@ public final class NavigationController {
         shell.setTranslationAction(() -> {
             if (alignedMaterial != null) state.navigate(ScreenId.TRANSLATION);
         });
+        shell.setConfigAction(this::openGroqConfig);
 
         refreshNavigationAvailability();
     }
@@ -72,6 +75,11 @@ public final class NavigationController {
 
     public void showSource() {
         startNewProject();
+    }
+
+    private boolean openGroqConfig() {
+        Window owner = shell.root().getScene() == null ? null : shell.root().getScene().getWindow();
+        return GroqSettingsDialog.show(owner);
     }
 
     private void startNewProject() {
@@ -329,7 +337,8 @@ public final class NavigationController {
                     alignedMaterial,
                     translationMaterial,
                     this::acceptTranslation,
-                    () -> state.navigate(ScreenId.PREPARATION)
+                    () -> state.navigate(ScreenId.PREPARATION),
+                    this::openGroqConfig
                 ).root();
             }
         }

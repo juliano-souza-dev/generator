@@ -24,7 +24,11 @@ Implementar a etapa de tradução do Generator desktop Java após a Preparação
 - autenticação/contrato inválido não entra em loop de retry;
 - preservar IDs, ordem e campos temporais;
 - resposta parcial nunca é aceita como completa;
-- segredo/API key nunca aparece em log nem é persistido sem mecanismo seguro explícito.
+- segredo/API key nunca aparece em log, snapshot ou artefato de projeto;
+- a API key pertence ao **Generator**, não ao projeto e não à sessão;
+- a configuração persistente da chave deve usar mecanismo seguro do sistema operacional;
+- uma chave já configurada deve ser reutilizada por todos os projetos;
+- ausência de chave ao iniciar Groq abre configuração; 401/403 deve pedir atualização da credencial.
 
 ## Structured output
 Quando o modelo ativo suportar Structured Outputs, preferir JSON Schema estrito. Caso contrário, usar JSON mode/validação local equivalente. Em todos os casos a validação final pertence ao Generator.
@@ -33,14 +37,16 @@ Quando o modelo ativo suportar Structured Outputs, preferir JSON Schema estrito.
 - o pacote externo é produzido sempre, independentemente do sucesso Groq;
 - contém o áudio técnico da cena e instruções completas do contrato de retorno;
 - falha/parcialidade Groq mantém o pacote disponível;
-- importação externa passa pela mesma validação de completude/integridade.
+- importação externa passa pela mesma validação de completude/integridade;
+- Groq e IA externa convergem para o mesmo TranslationMaterial, portanto não duplicar arquivos canônicos sem necessidade real de produto.
 
 ## UI
 Falar apenas em linguagem de produto, por exemplo:
 - Traduzindo material…
 - Material pronto.
 - Algumas traduções precisam ser concluídas.
-- Baixar pacote para processamento externo.
+- Abrir pacote externo.
+- Config.
 
 Não expor modelo, endpoint, TPM/RPM, bibliotecas, comandos ou paths na UI normal.
 
@@ -56,7 +62,6 @@ Source/download, IN/OUT, Wave, ASR/DTW, timings aprovados, pedagogia posterior, 
 ## Saída
 Implementação, testes de completude/chunking/rate-limit/fallback, evidências, riscos e handoff ao Orchestrator.
 
-
 ## Maturidade acumulada — Issue #18
 - O limite exato da conta/projeto não deve ser inferido das tabelas públicas: o Generator consulta metadados do modelo em runtime e reage aos headers efetivamente retornados.
 - Os headers públicos atuais expõem especialmente RPD/TPM restantes e resets; 429 usa `retry-after`. Não inventar RPM disponível a partir desses headers.
@@ -65,7 +70,6 @@ Implementação, testes de completude/chunking/rate-limit/fallback, evidências,
 - Nenhum chunk parcial é persistido como tradução concluída. Só o conjunto integral validado é publicado.
 - O pacote externo é criado antes da tentativa Groq e permanece disponível mesmo após sucesso automático.
 - O pacote externo desta etapa contém somente o áudio preparado e a instrução/contrato completo de retorno, conforme decisão de produto.
-- A chave Groq é somente de sessão/ambiente e nunca é escrita em projeto, snapshot ou log.
 - Retorno externo e retorno Groq convergem no mesmo TranslationMaterial validado; campos de timing/texto protegido continuam sob autoridade local.
 - Falha 400/401/403 não entra em loop de retry; 408/429/5xx têm retry limitado, com `retry-after` quando disponível.
 
@@ -74,10 +78,12 @@ Implementação, testes de completude/chunking/rate-limit/fallback, evidências,
 - Groq é caminho principal, mas nunca gate único. Processamento externo permanece disponível quando Groq falha, fica parcial ou atinge limites.
 - O pacote externo é criado antes da tentativa Groq e continua disponível mesmo após sucesso automático.
 - Nesta etapa, o pacote externo contém o áudio técnico preparado e a instrução/contrato completo de retorno JSON.
+- O pacote já gerado pode ser acessado abrindo sua pasta; não criar fluxo de download/exportação sem necessidade de produto.
 - Retorno Groq e retorno externo convergem no mesmo TranslationMaterial validado.
 - IDs, ordem, EN aprovado, words e timings são protegidos pelo Generator; somente conteúdo autorizado da tradução pode mudar.
 - Nenhum chunk parcial vira resultado final. Publicação é integral e validada.
 - Contexto e rate limits vêm do modelo/headers reais; não congelar limites públicos como regra de produto.
 - Retry é conservador: 408/429/5xx podem repetir com espera; 400/401/403 e violações de contrato não entram em loop.
-- Chave Groq é de sessão/ambiente, nunca persistida nem logada.
-- UI fala em “Traduzindo material”, “Traduções prontas” e “opção externa”; modelo, endpoint, tokens e retries ficam no log técnico.
+- A chave Groq é global do Generator, persistida de forma segura fora de ProjectState, reutilizada entre projetos e reinicializações.
+- Ao faltar chave, “Traduzir com Groq” deve abrir a configuração. O usuário também precisa de Config permanente para trocar a credencial quando quiser.
+- UI fala em “Traduzindo material”, “Traduções prontas”, “opção externa” e “Config”; modelo, endpoint, tokens e retries ficam no log técnico.
