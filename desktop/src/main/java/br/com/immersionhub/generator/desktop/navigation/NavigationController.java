@@ -1,5 +1,8 @@
 package br.com.immersionhub.generator.desktop.navigation;
 
+import br.com.immersionhub.generator.desktop.editorial.EditorialMaterial;
+import br.com.immersionhub.generator.desktop.editorial.EditorialModule;
+import br.com.immersionhub.generator.desktop.editorial.EditorialReviewService;
 import br.com.immersionhub.generator.desktop.model.MediaCut;
 import br.com.immersionhub.generator.desktop.model.SourceMedia;
 import br.com.immersionhub.generator.desktop.preparation.AlignedMaterial;
@@ -16,6 +19,8 @@ import br.com.immersionhub.generator.desktop.timing.TimingModule;
 import br.com.immersionhub.generator.desktop.translation.TranslationMaterial;
 import br.com.immersionhub.generator.desktop.translation.TranslationModule;
 import br.com.immersionhub.generator.desktop.ui.AppShell;
+import br.com.immersionhub.generator.desktop.ui.EditorialReviewUnavailableView;
+import br.com.immersionhub.generator.desktop.ui.EditorialReviewView;
 import br.com.immersionhub.generator.desktop.ui.GroqSettingsDialog;
 import br.com.immersionhub.generator.desktop.ui.HomeView;
 import br.com.immersionhub.generator.desktop.ui.PreparationView;
@@ -39,9 +44,15 @@ public final class NavigationController {
     private MediaCut mediaCut;
     private AlignedMaterial alignedMaterial;
     private TranslationMaterial translationMaterial;
+
+    private EditorialReviewService editorialReviewService;
+    private EditorialMaterial editorialMaterial;
+    private int editorialCueOrder = 1;
+
     private boolean preparationAutoStart;
     private boolean preparationNeedsRecovery;
     private boolean translationNeedsRecovery;
+    private boolean editorialNeedsRecovery;
 
     public NavigationController() {
         state.onChanged(this::render);
@@ -59,6 +70,9 @@ public final class NavigationController {
         });
         shell.setTranslationAction(() -> {
             if (alignedMaterial != null) state.navigate(ScreenId.TRANSLATION);
+        });
+        shell.setReviewAction(() -> {
+            if (translationMaterial != null) state.navigate(ScreenId.EDITORIAL_REVIEW);
         });
         shell.setConfigAction(this::openGroqConfig);
 
@@ -88,6 +102,7 @@ public final class NavigationController {
         mediaCut = null;
         alignedMaterial = null;
         translationMaterial = null;
+        resetEditorial();
         preparationAutoStart = false;
         preparationNeedsRecovery = false;
         translationNeedsRecovery = false;
@@ -99,6 +114,7 @@ public final class NavigationController {
         projectState = project;
         sourceMedia = project.sourceMedia().orElse(null);
         mediaCut = project.mediaCut().orElse(null);
+        resetEditorial();
 
         alignedMaterial = project.preparationCompleted() && mediaCut != null
             ? PreparationModule.loadAligned(
@@ -131,6 +147,8 @@ public final class NavigationController {
                 ProjectState recovered = project.withoutTranslation();
                 persist(recovered);
                 projectState = recovered;
+            } else if (translationMaterial != null) {
+                initializeEditorialReview();
             }
         }
 
@@ -143,6 +161,7 @@ public final class NavigationController {
             case WAVE -> state.navigate(ScreenId.WAVE);
             case PREPARATION -> state.navigate(ScreenId.PREPARATION);
             case TRANSLATION -> state.navigate(ScreenId.TRANSLATION);
+            case EDITORIAL_REVIEW -> state.navigate(ScreenId.EDITORIAL_REVIEW);
         }
     }
 
@@ -157,6 +176,7 @@ public final class NavigationController {
             mediaCut = null;
             alignedMaterial = null;
             translationMaterial = null;
+            resetEditorial();
         } else if (projectState.sourceMedia().isEmpty()) {
             ProjectState repaired = projectState.withSource(media);
             persist(repaired);
@@ -164,6 +184,7 @@ public final class NavigationController {
             mediaCut = null;
             alignedMaterial = null;
             translationMaterial = null;
+            resetEditorial();
         }
 
         sourceMedia = media;
@@ -179,6 +200,7 @@ public final class NavigationController {
         mediaCut = null;
         alignedMaterial = null;
         translationMaterial = null;
+        resetEditorial();
         preparationAutoStart = false;
         preparationNeedsRecovery = false;
         translationNeedsRecovery = false;
@@ -197,6 +219,7 @@ public final class NavigationController {
         mediaCut = cut;
         alignedMaterial = null;
         translationMaterial = null;
+        resetEditorial();
         preparationAutoStart = true;
         preparationNeedsRecovery = false;
         translationNeedsRecovery = false;
@@ -215,6 +238,7 @@ public final class NavigationController {
         projectState = next;
         alignedMaterial = material;
         translationMaterial = null;
+        resetEditorial();
         preparationAutoStart = false;
         preparationNeedsRecovery = false;
         translationNeedsRecovery = false;
@@ -233,7 +257,52 @@ public final class NavigationController {
         projectState = next;
         translationMaterial = material;
         translationNeedsRecovery = false;
+        initializeEditorialReview();
         refreshNavigationAvailability();
+        state.navigate(ScreenId.EDITORIAL_REVIEW);
+    }
+
+    private void acceptEditorialProgress(EditorialMaterial material, Integer cueOrder) {
+        editorialMaterial = material;
+        editorialCueOrder = cueOrder == null ? 1 : cueOrder;
+
+        if (projectState != null) {
+            ProjectState next = projectState.withEditorialActivity();
+            persist(next);
+            projectState = next;
+        }
+    }
+
+    private void initializeEditorialReview() {
+        editorialReviewService = null;
+        editorialMaterial = null;
+        editorialCueOrder = 1;
+        editorialNeedsRecovery = false;
+
+        if (projectState == null || translationMaterial == null) return;
+
+        try {
+            editorialReviewService = EditorialModule.createService(projectState.projectId());
+            editorialMaterial = editorialReviewService.loadOrCreate(translationMaterial);
+            editorialCueOrder = editorialReviewService.loadCursor(editorialMaterial);
+        } catch (Exception exception) {
+            editorialMaterial = null;
+            editorialCueOrder = 1;
+            editorialNeedsRecovery = true;
+        }
+    }
+
+    private void retryEditorialReview() {
+        initializeEditorialReview();
+        refreshNavigationAvailability();
+        state.navigate(ScreenId.EDITORIAL_REVIEW);
+    }
+
+    private void resetEditorial() {
+        editorialReviewService = null;
+        editorialMaterial = null;
+        editorialCueOrder = 1;
+        editorialNeedsRecovery = false;
     }
 
     private void persist(ProjectState project) {
@@ -276,6 +345,7 @@ public final class NavigationController {
         shell.setWaveEnabled(sourceMedia != null);
         shell.setPreparationEnabled(mediaCut != null);
         shell.setTranslationEnabled(alignedMaterial != null);
+        shell.setReviewEnabled(translationMaterial != null);
     }
 
     private void render(ScreenId screen) {
@@ -319,7 +389,7 @@ public final class NavigationController {
                     preparationNeedsRecovery
                 ).root();
             }
-        } else {
+        } else if (screen == ScreenId.TRANSLATION) {
             if (alignedMaterial == null || projectState == null) {
                 shown = ScreenId.PREPARATION;
                 content = new PreparationView(
@@ -339,6 +409,46 @@ public final class NavigationController {
                     this::acceptTranslation,
                     () -> state.navigate(ScreenId.PREPARATION),
                     this::openGroqConfig
+                ).root();
+            }
+        } else {
+            if (translationMaterial == null || projectState == null || mediaCut == null) {
+                shown = ScreenId.TRANSLATION;
+                if (alignedMaterial == null || projectState == null) {
+                    shown = ScreenId.PREPARATION;
+                    content = new PreparationView(
+                        mediaCut,
+                        preparationPipeline(),
+                        this::acceptPrepared,
+                        () -> state.navigate(ScreenId.WAVE),
+                        alignedMaterial,
+                        false,
+                        preparationNeedsRecovery
+                    ).root();
+                } else {
+                    content = new TranslationView(
+                        projectState.projectId(),
+                        alignedMaterial,
+                        translationMaterial,
+                        this::acceptTranslation,
+                        () -> state.navigate(ScreenId.PREPARATION),
+                        this::openGroqConfig
+                    ).root();
+                }
+            } else if (editorialNeedsRecovery || editorialMaterial == null || editorialReviewService == null) {
+                content = new EditorialReviewUnavailableView(
+                    this::retryEditorialReview,
+                    () -> state.navigate(ScreenId.TRANSLATION)
+                ).root();
+            } else {
+                content = new EditorialReviewView(
+                    editorialReviewService,
+                    translationMaterial,
+                    editorialMaterial,
+                    editorialCueOrder,
+                    mediaCut.outputPath(),
+                    this::acceptEditorialProgress,
+                    () -> state.navigate(ScreenId.TRANSLATION)
                 ).root();
             }
         }
