@@ -5,7 +5,7 @@ import br.com.immersionhub.generator.desktop.infrastructure.BundledTools;
 import java.nio.file.Path;
 
 public final class PreparationModule {
-    public static final String PIPELINE_VERSION = "preparation-v1";
+    public static final String PIPELINE_VERSION = "preparation-v2";
     public static final String ASR_VERSION = "whisper.cpp-b5130-base.en";
     public static final String ALIGNMENT_VERSION = "whisper.cpp-b5130-dtw-base.en";
 
