@@ -79,8 +79,12 @@ public final class NavigationController {
         projectState = project;
         sourceMedia = project.sourceMedia().orElse(null);
         mediaCut = project.mediaCut().orElse(null);
-        alignedMaterial = project.preparationCompleted()
-            ? PreparationModule.loadAligned(project.preparedMaterialId(), project.alignedMaterialId()).orElse(null)
+        alignedMaterial = project.preparationCompleted() && mediaCut != null
+            ? PreparationModule.loadAligned(
+                project.preparedMaterialId(),
+                project.alignedMaterialId(),
+                mediaCut
+            ).orElse(null)
             : null;
         preparationAutoStart = false;
 
