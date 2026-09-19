@@ -59,7 +59,7 @@ class WordReviewServiceTest {
 
         assertEquals(EditorialReviewStatus.PENDING, material.cues().getFirst().words().getFirst().reviewStatus());
         assertEquals(EditorialReviewStatus.APPROVED, material.cues().getFirst().words().get(1).reviewStatus());
-        assertEquals(first, service.nextPending(material, second).orElseThrow());
+        assertEquals(new WordReviewPosition(1, 3), service.nextPending(material, second).orElseThrow());
     }
 
     @Test
