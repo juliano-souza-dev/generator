@@ -9,7 +9,8 @@ public record AlignedMaterial(
     PreparedMaterial preparedMaterial,
     String alignerVersion,
     List<TimedText> words,
-    Instant createdAt
+    Instant createdAt,
+    TimingSource timingSource
 ) {
     public AlignedMaterial {
         id = Objects.requireNonNull(id, "id").trim();
@@ -17,10 +18,21 @@ public record AlignedMaterial(
         alignerVersion = Objects.requireNonNull(alignerVersion, "alignerVersion").trim();
         words = List.copyOf(Objects.requireNonNull(words, "words"));
         createdAt = Objects.requireNonNull(createdAt, "createdAt");
+        timingSource = Objects.requireNonNull(timingSource, "timingSource");
 
         if (id.isEmpty() || alignerVersion.isEmpty()) throw new IllegalArgumentException("Identidade de alinhamento incompleta.");
         if (words.isEmpty()) throw new IllegalArgumentException("Alinhamento sem palavras.");
         validate(words, preparedMaterial.mediaCut().durationMs());
+    }
+
+    public AlignedMaterial(
+        String id,
+        PreparedMaterial preparedMaterial,
+        String alignerVersion,
+        List<TimedText> words,
+        Instant createdAt
+    ) {
+        this(id, preparedMaterial, alignerVersion, words, createdAt, TimingSource.DTW_REFINED);
     }
 
     public AsrResult transcription() {
