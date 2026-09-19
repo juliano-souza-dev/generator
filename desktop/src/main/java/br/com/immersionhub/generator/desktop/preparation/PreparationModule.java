@@ -2,6 +2,7 @@ package br.com.immersionhub.generator.desktop.preparation;
 
 import br.com.immersionhub.generator.desktop.infrastructure.AppDirectories;
 import br.com.immersionhub.generator.desktop.infrastructure.BundledTools;
+import br.com.immersionhub.generator.desktop.model.MediaCut;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -13,6 +14,14 @@ public final class PreparationModule {
     private PreparationModule() {}
 
     public static Optional<AlignedMaterial> loadAligned(String preparedMaterialId, String alignedMaterialId) {
+        return loadAligned(preparedMaterialId, alignedMaterialId, null);
+    }
+
+    public static Optional<AlignedMaterial> loadAligned(
+        String preparedMaterialId,
+        String alignedMaterialId,
+        MediaCut currentCut
+    ) {
         if (preparedMaterialId == null || preparedMaterialId.isBlank()
             || alignedMaterialId == null || alignedMaterialId.isBlank()) {
             return Optional.empty();
@@ -25,6 +34,15 @@ public final class PreparationModule {
             new FileAlignedMaterialRepository(root.resolve("aligned"));
 
         return preparedRepository.load(preparedMaterialId)
+            .map(prepared -> currentCut == null ? prepared : new PreparedMaterial(
+                prepared.id(),
+                prepared.pipelineVersion(),
+                prepared.asrVersion(),
+                currentCut,
+                prepared.technicalAudio(),
+                prepared.transcription(),
+                prepared.createdAt()
+            ))
             .flatMap(prepared -> alignedRepository.load(alignedMaterialId, prepared));
     }
 
