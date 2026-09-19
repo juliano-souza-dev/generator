@@ -18,7 +18,8 @@ public record ReviewWorkspaceCheckpoint(
         return material != null
             && material.id().equals(materialId)
             && material.containsCursor(cursor)
-            && autosave.status() != AutosaveStatus.ERROR;
+            && (autosave.status() == AutosaveStatus.CLEAN
+                || autosave.status() == AutosaveStatus.SAVED);
     }
 
     public ReviewWorkspaceCheckpoint dirty() {
