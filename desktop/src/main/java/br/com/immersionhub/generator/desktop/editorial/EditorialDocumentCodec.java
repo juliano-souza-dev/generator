@@ -34,8 +34,25 @@ final class EditorialDocumentCodec {
                 || editorial.speechEndMs() != translated.speechEndMs()
                 || editorial.subtitleStartMs() != translated.subtitleStartMs()
                 || editorial.subtitleEndMs() != translated.subtitleEndMs()
+                || !editorial.speaker().equals(translated.speaker())
                 || !editorial.originalEn().equals(translated.originalEn())) {
                 throw new IllegalArgumentException("A revisão alterou campos protegidos da cue " + editorial.order() + ".");
+            }
+
+            if (editorial.words().size() != translated.words().size()) {
+                throw new IllegalArgumentException("A revisão alterou words protegidas da cue " + editorial.order() + ".");
+            }
+            for (int wordIndex = 0; wordIndex < editorial.words().size(); wordIndex++) {
+                EditorialWord editorialWord = editorial.words().get(wordIndex);
+                var translatedWord = translated.words().get(wordIndex);
+                if (!editorialWord.originalEn().equals(translatedWord.text())
+                    || editorialWord.startMs() != translatedWord.startMs()
+                    || editorialWord.endMs() != translatedWord.endMs()
+                    || !java.util.Objects.equals(editorialWord.confidence(), translatedWord.confidence())) {
+                    throw new IllegalArgumentException(
+                        "A revisão alterou word/timing protegido da cue " + editorial.order() + "."
+                    );
+                }
             }
         }
 
