@@ -25,7 +25,10 @@ public final class MaterialPreparationService {
 
         Path dir=workspace.resolve("prepared").resolve(id);
         Path technicalAudio=audio.extract(cut,dir);
-        AsrResult result=asr.transcribeEnglish(technicalAudio);
+        AsrResult result=AsrTimelineNormalizer.normalize(
+            asr.transcribeEnglish(technicalAudio),
+            cut.durationMs()
+        );
         result.validate(cut.durationMs());
         PreparedMaterial material=new PreparedMaterial(id,pipelineVersion,asr.version(),cut,technicalAudio,result,Instant.now());
         repository.save(material);
