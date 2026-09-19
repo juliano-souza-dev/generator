@@ -3,6 +3,7 @@ package br.com.immersionhub.generator.desktop.project;
 import br.com.immersionhub.generator.desktop.model.MediaCut;
 import br.com.immersionhub.generator.desktop.model.SourceMedia;
 import br.com.immersionhub.generator.desktop.preparation.AlignedMaterial;
+import br.com.immersionhub.generator.desktop.translation.TranslationMaterial;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,10 +32,12 @@ public record ProjectState(
     Set<ProjectStage> completedStages,
     String preparedMaterialId,
     String alignedMaterialId,
+    String translationMaterialId,
+    String translationSource,
     Instant createdAt,
     Instant updatedAt
 ) {
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
 
     public ProjectState {
         if (schemaVersion <= 0) schemaVersion = CURRENT_SCHEMA_VERSION;
@@ -46,9 +49,7 @@ public record ProjectState(
         sourceTitle = requireText(sourceTitle, "sourceTitle");
         sourceFetchedAt = requireText(sourceFetchedAt, "sourceFetchedAt");
         currentStage = Objects.requireNonNull(currentStage, "currentStage");
-        completedStages = completedStages == null
-            ? Set.of()
-            : Set.copyOf(completedStages);
+        completedStages = completedStages == null ? Set.of() : Set.copyOf(completedStages);
         createdAt = Objects.requireNonNull(createdAt, "createdAt");
         updatedAt = Objects.requireNonNull(updatedAt, "updatedAt");
         if (sourceDurationMs <= 0) throw new IllegalArgumentException("Duração da fonte inválida.");
@@ -57,49 +58,23 @@ public record ProjectState(
     public static ProjectState start(SourceMedia source) {
         Instant now = Instant.now();
         return new ProjectState(
-            CURRENT_SCHEMA_VERSION,
-            UUID.randomUUID().toString(),
-            source.title(),
-            source.sourceId(),
-            source.canonicalUrl(),
-            source.localPath().toString(),
-            source.title(),
-            source.durationMs(),
-            source.fetchedAt().toString(),
-            null,
-            null,
-            null,
-            null,
-            ProjectStage.WAVE,
-            EnumSet.of(ProjectStage.SOURCE),
-            null,
-            null,
-            now,
-            now
+            CURRENT_SCHEMA_VERSION, UUID.randomUUID().toString(), source.title(),
+            source.sourceId(), source.canonicalUrl(), source.localPath().toString(),
+            source.title(), source.durationMs(), source.fetchedAt().toString(),
+            null, null, null, null,
+            ProjectStage.WAVE, EnumSet.of(ProjectStage.SOURCE),
+            null, null, null, null, now, now
         );
     }
 
     public ProjectState withSource(SourceMedia source) {
         return new ProjectState(
-            CURRENT_SCHEMA_VERSION,
-            projectId,
-            source.title(),
-            source.sourceId(),
-            source.canonicalUrl(),
-            source.localPath().toString(),
-            source.title(),
-            source.durationMs(),
-            source.fetchedAt().toString(),
-            null,
-            null,
-            null,
-            null,
-            ProjectStage.WAVE,
-            EnumSet.of(ProjectStage.SOURCE),
-            null,
-            null,
-            createdAt,
-            Instant.now()
+            CURRENT_SCHEMA_VERSION, projectId, source.title(),
+            source.sourceId(), source.canonicalUrl(), source.localPath().toString(),
+            source.title(), source.durationMs(), source.fetchedAt().toString(),
+            null, null, null, null,
+            ProjectStage.WAVE, EnumSet.of(ProjectStage.SOURCE),
+            null, null, null, null, createdAt, Instant.now()
         );
     }
 
@@ -108,50 +83,39 @@ public record ProjectState(
             throw new IllegalArgumentException("O recorte não pertence à fonte do projeto.");
         }
         return new ProjectState(
-            CURRENT_SCHEMA_VERSION,
-            projectId,
-            title,
-            sourceId,
-            canonicalUrl,
-            sourcePath,
-            sourceTitle,
-            sourceDurationMs,
-            sourceFetchedAt,
-            cut.startMs(),
-            cut.endMs(),
-            cut.outputPath().toString(),
-            cut.createdAt().toString(),
-            ProjectStage.PREPARATION,
-            EnumSet.of(ProjectStage.SOURCE, ProjectStage.WAVE),
-            null,
-            null,
-            createdAt,
-            Instant.now()
+            CURRENT_SCHEMA_VERSION, projectId, title,
+            sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
+            cut.startMs(), cut.endMs(), cut.outputPath().toString(), cut.createdAt().toString(),
+            ProjectStage.PREPARATION, EnumSet.of(ProjectStage.SOURCE, ProjectStage.WAVE),
+            null, null, null, null, createdAt, Instant.now()
         );
     }
 
     public ProjectState withPrepared(AlignedMaterial material) {
         MediaCut cut = material.preparedMaterial().mediaCut();
         return new ProjectState(
-            CURRENT_SCHEMA_VERSION,
-            projectId,
-            title,
-            sourceId,
-            canonicalUrl,
-            sourcePath,
-            sourceTitle,
-            sourceDurationMs,
-            sourceFetchedAt,
-            cut.startMs(),
-            cut.endMs(),
-            cut.outputPath().toString(),
-            cut.createdAt().toString(),
-            ProjectStage.PREPARATION,
+            CURRENT_SCHEMA_VERSION, projectId, title,
+            sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
+            cut.startMs(), cut.endMs(), cut.outputPath().toString(), cut.createdAt().toString(),
+            ProjectStage.TRANSLATION,
             EnumSet.of(ProjectStage.SOURCE, ProjectStage.WAVE, ProjectStage.PREPARATION),
-            material.preparedMaterial().id(),
-            material.id(),
-            createdAt,
-            Instant.now()
+            material.preparedMaterial().id(), material.id(),
+            null, null, createdAt, Instant.now()
+        );
+    }
+
+    public ProjectState withTranslation(TranslationMaterial material) {
+        Set<ProjectStage> completed = EnumSet.noneOf(ProjectStage.class);
+        completed.addAll(completedStages);
+        completed.add(ProjectStage.TRANSLATION);
+        return new ProjectState(
+            CURRENT_SCHEMA_VERSION, projectId, title,
+            sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
+            cutStartMs, cutEndMs, cutPath, cutCreatedAt,
+            ProjectStage.TRANSLATION, completed,
+            preparedMaterialId, alignedMaterialId,
+            material.id(), material.source().name(),
+            createdAt, Instant.now()
         );
     }
 
@@ -159,26 +123,27 @@ public record ProjectState(
         Set<ProjectStage> completed = EnumSet.noneOf(ProjectStage.class);
         completed.addAll(completedStages);
         completed.remove(ProjectStage.PREPARATION);
+        completed.remove(ProjectStage.TRANSLATION);
         return new ProjectState(
-            CURRENT_SCHEMA_VERSION,
-            projectId,
-            title,
-            sourceId,
-            canonicalUrl,
-            sourcePath,
-            sourceTitle,
-            sourceDurationMs,
-            sourceFetchedAt,
-            cutStartMs,
-            cutEndMs,
-            cutPath,
-            cutCreatedAt,
-            ProjectStage.PREPARATION,
-            completed,
-            null,
-            null,
-            createdAt,
-            Instant.now()
+            CURRENT_SCHEMA_VERSION, projectId, title,
+            sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
+            cutStartMs, cutEndMs, cutPath, cutCreatedAt,
+            ProjectStage.PREPARATION, completed,
+            null, null, null, null, createdAt, Instant.now()
+        );
+    }
+
+    public ProjectState withoutTranslation() {
+        Set<ProjectStage> completed = EnumSet.noneOf(ProjectStage.class);
+        completed.addAll(completedStages);
+        completed.remove(ProjectStage.TRANSLATION);
+        return new ProjectState(
+            CURRENT_SCHEMA_VERSION, projectId, title,
+            sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
+            cutStartMs, cutEndMs, cutPath, cutCreatedAt,
+            ProjectStage.TRANSLATION, completed,
+            preparedMaterialId, alignedMaterialId,
+            null, null, createdAt, Instant.now()
         );
     }
 
@@ -188,18 +153,19 @@ public record ProjectState(
             && alignedMaterialId != null && !alignedMaterialId.isBlank();
     }
 
+    public boolean translationCompleted() {
+        return completedStages.contains(ProjectStage.TRANSLATION)
+            && translationMaterialId != null && !translationMaterialId.isBlank()
+            && translationSource != null && !translationSource.isBlank();
+    }
+
     public Optional<SourceMedia> sourceMedia() {
         try {
             Path path = Path.of(sourcePath).toAbsolutePath().normalize();
             if (!Files.isRegularFile(path)) return Optional.empty();
             return Optional.of(new SourceMedia(
-                sourceId,
-                canonicalUrl,
-                path,
-                sourceTitle,
-                sourceDurationMs,
-                Instant.parse(sourceFetchedAt),
-                true
+                sourceId, canonicalUrl, path, sourceTitle, sourceDurationMs,
+                Instant.parse(sourceFetchedAt), true
             ));
         } catch (Exception ignored) {
             return Optional.empty();
@@ -217,13 +183,8 @@ public record ProjectState(
             Path output = Path.of(cutPath).toAbsolutePath().normalize();
             if (!Files.isRegularFile(output)) return Optional.empty();
             return Optional.of(new MediaCut(
-                sourceId,
-                source.get().localPath(),
-                output,
-                cutStartMs,
-                cutEndMs,
-                cutEndMs - cutStartMs,
-                Instant.parse(cutCreatedAt)
+                sourceId, source.get().localPath(), output,
+                cutStartMs, cutEndMs, cutEndMs - cutStartMs, Instant.parse(cutCreatedAt)
             ));
         } catch (Exception ignored) {
             return Optional.empty();
@@ -239,25 +200,23 @@ public record ProjectState(
         if (stage == ProjectStage.WAVE && completedStages.contains(stage) && mediaCut().isEmpty()) {
             return ProjectStageStatus.NEEDS_REPROCESSING;
         }
-        if (stage == ProjectStage.PREPARATION
-            && completedStages.contains(stage)
-            && !preparationCompleted()) {
+        if (stage == ProjectStage.PREPARATION && completedStages.contains(stage) && !preparationCompleted()) {
             return ProjectStageStatus.NEEDS_REPROCESSING;
         }
-        if (completedStages.contains(stage)) {
-            return ProjectStageStatus.COMPLETED;
+        if (stage == ProjectStage.TRANSLATION && completedStages.contains(stage) && !translationCompleted()) {
+            return ProjectStageStatus.NEEDS_REPROCESSING;
         }
-        if (currentStage == stage) {
-            return ProjectStageStatus.IN_PROGRESS;
-        }
+        if (completedStages.contains(stage)) return ProjectStageStatus.COMPLETED;
+        if (currentStage == stage) return ProjectStageStatus.IN_PROGRESS;
         return ProjectStageStatus.NOT_STARTED;
     }
 
     public ProjectStage minimumResumeStage() {
         if (sourceMedia().isEmpty()) return ProjectStage.SOURCE;
         if (currentStage == ProjectStage.SOURCE) return ProjectStage.SOURCE;
-        if (currentStage == ProjectStage.WAVE) return ProjectStage.WAVE;
-        return mediaCut().isPresent() ? ProjectStage.PREPARATION : ProjectStage.WAVE;
+        if (mediaCut().isEmpty()) return ProjectStage.WAVE;
+        if (!preparationCompleted()) return ProjectStage.PREPARATION;
+        return ProjectStage.TRANSLATION;
     }
 
     public String recoveryMessage() {
