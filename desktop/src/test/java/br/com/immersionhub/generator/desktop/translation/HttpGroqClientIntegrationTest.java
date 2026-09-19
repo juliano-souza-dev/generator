@@ -49,9 +49,12 @@ class HttpGroqClientIntegrationTest {
                 exchange.sendResponseHeaders(429, body.length);
                 exchange.getResponseBody().write(body);
             } else {
-                byte[] body = """
-                    {"choices":[{"message":{"content":"{\"translations\":[{\"order\":1,\"pt\":\"Olá\"}]}"}}]}
-                    """.getBytes(StandardCharsets.UTF_8);
+                var response = mapper.createObjectNode();
+                var message = response.putArray("choices")
+                    .addObject()
+                    .putObject("message");
+                message.put("content", "{\\\"translations\\\":[{\\\"order\\\":1,\\\"pt\\\":\\\"Olá\\\"}]}");
+                byte[] body = mapper.writeValueAsBytes(response);
                 exchange.getResponseHeaders().add("x-ratelimit-remaining-requests", "98");
                 exchange.getResponseHeaders().add("x-ratelimit-remaining-tokens", "3000");
                 exchange.sendResponseHeaders(200, body.length);
