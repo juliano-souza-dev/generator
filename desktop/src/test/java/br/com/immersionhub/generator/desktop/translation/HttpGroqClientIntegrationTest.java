@@ -53,7 +53,7 @@ class HttpGroqClientIntegrationTest {
                 var message = response.putArray("choices")
                     .addObject()
                     .putObject("message");
-                message.put("content", "{\\\"translations\\\":[{\\\"order\\\":1,\\\"pt\\\":\\\"Olá\\\"}]}");
+                message.put("content", "{\"translations\":[{\"order\":1,\"pt\":\"Olá\"}]}");
                 byte[] body = mapper.writeValueAsBytes(response);
                 exchange.getResponseHeaders().add("x-ratelimit-remaining-requests", "98");
                 exchange.getResponseHeaders().add("x-ratelimit-remaining-tokens", "3000");
