@@ -11,7 +11,11 @@ import javafx.scene.layout.VBox;
 public final class EditorialReviewUnavailableView {
     private final VBox root = new VBox(14);
 
-    public EditorialReviewUnavailableView(Runnable retryAction, Runnable backAction) {
+    public EditorialReviewUnavailableView(
+        Runnable retryAction,
+        Runnable rebuildAction,
+        Runnable backAction
+    ) {
         root.setPadding(new Insets(36));
         root.getStyleClass().add("content-page");
 
@@ -22,23 +26,33 @@ public final class EditorialReviewUnavailableView {
         title.getStyleClass().add("page-title");
 
         Label copy = new Label(
-            "A tradução foi preservada, mas a revisão salva não pôde ser aberta com segurança. Tente novamente ou volte para a tradução."
+            "A tradução e todas as etapas anteriores foram preservadas. Você pode verificar novamente ou recriar somente a revisão editorial."
         );
         copy.setWrapText(true);
         copy.getStyleClass().add("page-copy");
 
-        Button retry = new Button("Tentar novamente");
-        retry.getStyleClass().add("primary-button");
+        Label warning = new Label(
+            "Recriar a revisão descarta apenas as decisões editoriais que não puderam ser recuperadas."
+        );
+        warning.setWrapText(true);
+        warning.getStyleClass().add("project-card-warning");
+
+        Button retry = new Button("Verificar novamente");
+        retry.getStyleClass().add("secondary-button");
         retry.setOnAction(event -> retryAction.run());
+
+        Button rebuild = new Button("Recriar revisão");
+        rebuild.getStyleClass().add("primary-button");
+        rebuild.setOnAction(event -> rebuildAction.run());
 
         Button back = new Button("← Tradução");
         back.getStyleClass().add("secondary-button");
         back.setOnAction(event -> backAction.run());
 
-        HBox actions = new HBox(10, back, retry);
+        HBox actions = new HBox(10, back, retry, rebuild);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        root.getChildren().addAll(eyebrow, title, copy, actions);
+        root.getChildren().addAll(eyebrow, title, copy, warning, actions);
     }
 
     public Parent root() {
