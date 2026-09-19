@@ -139,6 +139,13 @@ public final class EditorialReviewView {
             actions
         );
 
+        root.parentProperty().addListener((obs, oldParent, newParent) -> {
+            if (oldParent != null && newParent == null) {
+                persistDraftIfChanged();
+                disposePlayer();
+            }
+        });
+
         loadCue(currentOrder);
     }
 
