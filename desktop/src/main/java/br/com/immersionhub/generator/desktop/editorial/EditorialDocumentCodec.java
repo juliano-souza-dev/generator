@@ -45,12 +45,18 @@ final class EditorialDocumentCodec {
             for (int wordIndex = 0; wordIndex < editorial.words().size(); wordIndex++) {
                 EditorialWord editorialWord = editorial.words().get(wordIndex);
                 var translatedWord = translated.words().get(wordIndex);
-                if (!editorialWord.originalEn().equals(translatedWord.text())
+                if (editorialWord.index() != wordIndex + 1
+                    || !editorialWord.originalEn().equals(translatedWord.text())
+                    || !editorialWord.approvedEn().equals(translatedWord.text())
+                    || !editorialWord.pt().isEmpty()
                     || editorialWord.startMs() != translatedWord.startMs()
                     || editorialWord.endMs() != translatedWord.endMs()
-                    || !java.util.Objects.equals(editorialWord.confidence(), translatedWord.confidence())) {
+                    || !java.util.Objects.equals(editorialWord.confidence(), translatedWord.confidence())
+                    || !editorialWord.semanticGroupId().isEmpty()
+                    || editorialWord.semanticGroupRole() != SemanticGroupRole.NONE
+                    || editorialWord.reviewStatus() != EditorialReviewStatus.PENDING) {
                     throw new IllegalArgumentException(
-                        "A revisão alterou word/timing protegido da cue " + editorial.order() + "."
+                        "A revisão de cues alterou words protegidas da cue " + editorial.order() + "."
                     );
                 }
             }
