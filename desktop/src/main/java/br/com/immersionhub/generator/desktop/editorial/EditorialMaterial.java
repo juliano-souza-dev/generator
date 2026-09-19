@@ -15,7 +15,7 @@ public record EditorialMaterial(
     List<EditorialReconciliation> reconciliations,
     Instant createdAt
 ) {
-    public static final String SCHEMA_VERSION = "1.0";
+    public static final String SCHEMA_VERSION = "1.1";
 
     public EditorialMaterial(
         String id,
@@ -71,6 +71,27 @@ public record EditorialMaterial(
             && cues.stream().allMatch(cue ->
                 cue.words().stream().allMatch(word -> word.reviewStatus() == EditorialReviewStatus.APPROVED)
             );
+    }
+
+    public EditorialMaterial upgradeToCurrentSchema() {
+        if (SCHEMA_VERSION.equals(schemaVersion)) return this;
+        if (!"1.0".equals(schemaVersion)) {
+            throw new IllegalArgumentException("Versão editorial não suportada para atualização.");
+        }
+        String nextId = EditorialIds.materialId(
+            translationMaterialId,
+            SCHEMA_VERSION,
+            cues,
+            reconciliations
+        );
+        return new EditorialMaterial(
+            nextId,
+            translationMaterialId,
+            SCHEMA_VERSION,
+            cues,
+            reconciliations,
+            createdAt
+        );
     }
 
     public EditorialMaterial withCues(List<EditorialCue> updatedCues) {
