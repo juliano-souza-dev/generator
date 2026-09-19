@@ -55,3 +55,16 @@ Source/download, IN/OUT, Wave, ASR/DTW, timings aprovados, pedagogia posterior, 
 
 ## Saída
 Implementação, testes de completude/chunking/rate-limit/fallback, evidências, riscos e handoff ao Orchestrator.
+
+
+## Maturidade acumulada — Issue #18
+- O limite exato da conta/projeto não deve ser inferido das tabelas públicas: o Generator consulta metadados do modelo em runtime e reage aos headers efetivamente retornados.
+- Os headers públicos atuais expõem especialmente RPD/TPM restantes e resets; 429 usa `retry-after`. Não inventar RPM disponível a partir desses headers.
+- O orçamento de contexto deve usar `context_window` e `max_completion_tokens` do modelo ativo com margem conservadora, nunca valores congelados da documentação.
+- Chunking é por cues inteiras. Uma cue nunca é cortada silenciosamente para caber.
+- Nenhum chunk parcial é persistido como tradução concluída. Só o conjunto integral validado é publicado.
+- O pacote externo é criado antes da tentativa Groq e permanece disponível mesmo após sucesso automático.
+- O pacote externo desta etapa contém somente o áudio preparado e a instrução/contrato completo de retorno, conforme decisão de produto.
+- A chave Groq é somente de sessão/ambiente e nunca é escrita em projeto, snapshot ou log.
+- Retorno externo e retorno Groq convergem no mesmo TranslationMaterial validado; campos de timing/texto protegido continuam sob autoridade local.
+- Falha 400/401/403 não entra em loop de retry; 408/429/5xx têm retry limitado, com `retry-after` quando disponível.
