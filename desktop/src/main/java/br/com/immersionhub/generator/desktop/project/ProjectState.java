@@ -119,6 +119,18 @@ public record ProjectState(
         );
     }
 
+    public ProjectState withEditorialActivity() {
+        return new ProjectState(
+            CURRENT_SCHEMA_VERSION, projectId, title,
+            sourceId, canonicalUrl, sourcePath, sourceTitle, sourceDurationMs, sourceFetchedAt,
+            cutStartMs, cutEndMs, cutPath, cutCreatedAt,
+            ProjectStage.EDITORIAL_REVIEW, completedStages,
+            preparedMaterialId, alignedMaterialId,
+            translationMaterialId, translationSource,
+            createdAt, Instant.now()
+        );
+    }
+
     public ProjectState withoutPreparation() {
         Set<ProjectStage> completed = EnumSet.noneOf(ProjectStage.class);
         completed.addAll(completedStages);
