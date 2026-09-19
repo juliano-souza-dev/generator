@@ -102,6 +102,10 @@ class TranslationServiceTest {
         Path returned = Files.writeString(fixture.root.resolve("returned.json"), valid);
         TranslationMaterial imported = service(fixture, null).importExternal(returned, base);
         assertEquals(TranslationSource.EXTERNAL, imported.source());
+        TranslationMaterial reloaded = new FileTranslationMaterialRepository(fixture.translationDir)
+            .load(base)
+            .orElseThrow();
+        assertEquals(TranslationSource.EXTERNAL, reloaded.source());
 
         String tampered = valid.replace("\"speechStartMs\" : 0", "\"speechStartMs\" : 10");
         Path invalid = Files.writeString(fixture.root.resolve("tampered.json"), tampered);
