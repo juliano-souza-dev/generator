@@ -38,6 +38,17 @@ public final class PreparationView {
         Consumer<AlignedMaterial> completedAction,
         Runnable backAction
     ) {
+        this(cut, pipeline, completedAction, backAction, null, true);
+    }
+
+    public PreparationView(
+        MediaCut cut,
+        PreparationPipeline pipeline,
+        Consumer<AlignedMaterial> completedAction,
+        Runnable backAction,
+        AlignedMaterial existingMaterial,
+        boolean startAutomatically
+    ) {
         this.cut = Objects.requireNonNull(cut);
         this.pipeline = Objects.requireNonNull(pipeline);
         this.completedAction = Objects.requireNonNull(completedAction);
@@ -82,7 +93,27 @@ public final class PreparationView {
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         root.getChildren().addAll(eyebrow, title, source, progress, status, detail, progressLog, actions);
-        start();
+
+        if (existingMaterial != null) {
+            progress.setVisible(false);
+            status.setText("Material pronto.");
+            detail.setText(
+                existingMaterial.timingSource() == br.com.immersionhub.generator.desktop.preparation.TimingSource.DTW_REFINED
+                    ? "Transcrição e tempos preparados para a próxima etapa."
+                    : "Material preparado com os tempos disponíveis."
+            );
+            appendProgress("Material já preparado. Nenhum processamento foi repetido.");
+        } else if (startAutomatically) {
+            start();
+        } else {
+            progress.setVisible(false);
+            status.setText("Preparação pausada.");
+            detail.setText("Continue quando estiver pronto. As etapas anteriores não serão refeitas.");
+            retry.setText("Continuar preparação");
+            retry.setVisible(true);
+            retry.setManaged(true);
+            appendProgress("Preparação pronta para continuar.");
+        }
     }
 
     public Parent root() {
@@ -91,6 +122,7 @@ public final class PreparationView {
 
     private void start() {
         attempt++;
+        retry.setText("Tentar novamente");
         appendProgress((attempt == 1 ? "" : System.lineSeparator()) + "Tentativa " + attempt);
         retry.setVisible(false);
         retry.setManaged(false);
