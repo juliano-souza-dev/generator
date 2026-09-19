@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public final class HttpGroqClient implements GroqClient {
     private final GroqConfig config;
@@ -20,10 +21,15 @@ public final class HttpGroqClient implements GroqClient {
     private final ObjectMapper mapper;
     private final GroqRateController rateController;
     private final TokenEstimator estimator;
+    private final Consumer<String> eventLog;
 
     private volatile GroqModelInfo modelInfo;
 
     public HttpGroqClient(GroqConfig config) {
+        this(config, ignored -> {});
+    }
+
+    public HttpGroqClient(GroqConfig config, Consumer<String> eventLog) {
         this(
             config,
             HttpClient.newBuilder()
@@ -31,7 +37,8 @@ public final class HttpGroqClient implements GroqClient {
                 .build(),
             new ObjectMapper(),
             new GroqRateController(),
-            new TokenEstimator()
+            new TokenEstimator(),
+            eventLog
         );
     }
 
@@ -40,13 +47,15 @@ public final class HttpGroqClient implements GroqClient {
         HttpClient http,
         ObjectMapper mapper,
         GroqRateController rateController,
-        TokenEstimator estimator
+        TokenEstimator estimator,
+        Consumer<String> eventLog
     ) {
         this.config = config;
         this.http = http;
         this.mapper = mapper;
         this.rateController = rateController;
         this.estimator = estimator;
+        this.eventLog = eventLog == null ? ignored -> {} : eventLog;
     }
 
     @Override
@@ -73,6 +82,11 @@ public final class HttpGroqClient implements GroqClient {
             maxCompletion
         );
         modelInfo = resolved;
+        eventLog.accept(
+            "groq.model.ready model=" + resolved.id()
+                + " contextWindow=" + resolved.contextWindow()
+                + " maxCompletion=" + resolved.maxCompletionTokens()
+        );
         return resolved;
     }
 
@@ -91,6 +105,12 @@ public final class HttpGroqClient implements GroqClient {
         );
 
         rateController.beforeRequest(estimatedPrompt + requestedCompletion);
+        eventLog.accept(
+            "groq.request.start model=" + model.id()
+                + " cues=" + cues.size()
+                + " estimatedPrompt=" + estimatedPrompt
+                + " maxCompletion=" + requestedCompletion
+        );
 
         String body = requestBody(cues, requestedCompletion);
         int attempt = 0;
@@ -114,6 +134,10 @@ public final class HttpGroqClient implements GroqClient {
                         rate
                     );
                 }
+                eventLog.accept(
+                    "groq.request.ready model=" + model.id()
+                        + " cues=" + cues.size()
+                );
                 return new GroqCompletion(content, rate);
             }
 
@@ -122,6 +146,10 @@ public final class HttpGroqClient implements GroqClient {
                 throw error;
             }
 
+            eventLog.accept(
+                "groq.retry status=" + error.statusCode()
+                    + " attempt=" + (attempt + 1)
+            );
             rateController.waitAfterFailure(error, attempt);
             attempt++;
         }
