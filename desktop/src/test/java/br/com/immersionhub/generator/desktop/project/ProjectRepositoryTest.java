@@ -133,6 +133,61 @@ class ProjectRepositoryTest {
     }
 
     @Test
+    void migratesTranslatedV2ProjectDirectlyToEditorialReview() throws Exception {
+        Path dir = Files.createTempDirectory("project-v2-review");
+        SourceMedia source = source(dir, "source-v2", "Projeto V2");
+        MediaCut cut = cut(dir, source, 0, 1000);
+
+        Path audio = Files.writeString(dir.resolve("audio-v2.wav"), "a");
+        br.com.immersionhub.generator.desktop.preparation.AsrResult transcript =
+            new br.com.immersionhub.generator.desktop.preparation.AsrResult(
+                "en",
+                "hello",
+                java.util.List.of(new br.com.immersionhub.generator.desktop.preparation.TimedText("hello", 0, 1000)),
+                java.util.List.of(new br.com.immersionhub.generator.desktop.preparation.TimedText("hello", 0, 1000))
+            );
+        br.com.immersionhub.generator.desktop.preparation.PreparedMaterial prepared =
+            new br.com.immersionhub.generator.desktop.preparation.PreparedMaterial(
+                "prepared-v2", "pipeline", "asr", cut, audio, transcript, Instant.EPOCH
+            );
+        br.com.immersionhub.generator.desktop.preparation.AlignedMaterial aligned =
+            new br.com.immersionhub.generator.desktop.preparation.AlignedMaterial(
+                "aligned-v2", prepared, "dtw", transcript.words(), Instant.EPOCH,
+                br.com.immersionhub.generator.desktop.preparation.TimingSource.DTW_REFINED
+            );
+        br.com.immersionhub.generator.desktop.translation.TranslationMaterial translation =
+            new br.com.immersionhub.generator.desktop.translation.TranslationMaterial(
+                "translation-v2",
+                aligned.id(),
+                br.com.immersionhub.generator.desktop.translation.TranslationMaterial.SCHEMA_VERSION,
+                java.util.List.of(new br.com.immersionhub.generator.desktop.translation.TranslationCue(
+                    1, 0, 1000, 0, 1000, "", "hello", "hello", "olá", transcript.words()
+                )),
+                br.com.immersionhub.generator.desktop.translation.TranslationSource.GROQ,
+                Instant.EPOCH
+            );
+
+        ProjectRepository repository = new ProjectRepository(dir.resolve("projects"));
+        ProjectState current = ProjectState.start(source)
+            .withCut(cut)
+            .withPrepared(aligned)
+            .withTranslation(translation);
+        repository.save(current);
+
+        Path json = repository.projectDirectory(current.projectId()).resolve("project.json");
+        String legacy = Files.readString(json)
+            .replace("\"schemaVersion\" : " + ProjectState.CURRENT_SCHEMA_VERSION, "\"schemaVersion\" : 2")
+            .replace("\"currentStage\" : \"EDITORIAL_REVIEW\"", "\"currentStage\" : \"TRANSLATION\"");
+        Files.writeString(json, legacy);
+
+        ProjectState loaded = repository.list().projects().getFirst();
+
+        assertEquals(ProjectStage.EDITORIAL_REVIEW, loaded.currentStage());
+        assertEquals(ProjectStage.EDITORIAL_REVIEW, loaded.minimumResumeStage());
+        assertTrue(loaded.translationCompleted());
+    }
+
+    @Test
     void keepsMultipleProjectsIndependent() throws Exception {
         Path dir = Files.createTempDirectory("project-multiple");
         ProjectRepository repository = new ProjectRepository(dir.resolve("projects"));
