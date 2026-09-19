@@ -13,6 +13,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>21.0.11</javafx.version>
     <jackson.version>2.18.2</jackson.version>
+    <jna.version>5.19.1</jna.version>
     <junit.version>5.11.4</junit.version>
   </properties>
 
@@ -31,6 +32,11 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
       <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna-platform</artifactId>
+      <version>${jna.version}</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
