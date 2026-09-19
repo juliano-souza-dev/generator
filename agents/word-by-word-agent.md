@@ -31,8 +31,20 @@ Implementar e validar a revisão humana das unidades Word by Word sobre material
 - reabrir item aprovado;
 - persistir cursor de retomada.
 
+## Maturidade acumulada — Issue #45
+- grupos semânticos continuam sendo as mesmas words; não criar schema paralelo de unidades;
+- grupo é contíguo, dentro da mesma cue, com um LEAD e um ou mais MEMBER;
+- navegação/progresso contam o grupo como uma única unidade;
+- agrupar com anterior/próxima pode mesclar grupos já existentes;
+- mudança de grupo invalida somente as unidades afetadas;
+- cada word preserva sua tradução individual conhecida para permitir round-trip seguro;
+- somente o líder contém a tradução corrente do grupo; membros mantêm PT de grupo vazio;
+- desagrupar restaura traduções individuais conhecidas e deixa todas as unidades afetadas PENDING;
+- tradução individual desconhecida permanece vazia; nunca inventar conteúdo;
+- ordem das words e timings existentes são preservados;
+- material editorial v1.0 é aceito e atualizado para v1.1 quando o primeiro agrupamento exigir o backup individual.
+
 ## Ainda não pode antecipar
-- criar/alterar grupos semânticos (#45);
 - timing manual;
 - speakers;
 - materiais finais.
