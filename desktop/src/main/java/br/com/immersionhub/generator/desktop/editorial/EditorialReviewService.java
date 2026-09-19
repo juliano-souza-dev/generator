@@ -6,6 +6,7 @@ import br.com.immersionhub.generator.desktop.translation.TranslationMaterial;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 
 public final class EditorialReviewService {
@@ -30,15 +31,22 @@ public final class EditorialReviewService {
         this.wordReconciler = Objects.requireNonNull(wordReconciler, "wordReconciler");
     }
 
-    public EditorialMaterial loadOrCreate(TranslationMaterial translation) throws Exception {
+    public Optional<EditorialMaterial> load(TranslationMaterial translation) throws Exception {
         Objects.requireNonNull(translation, "translation");
-        var existing = repository.load(translation);
-        if (existing.isPresent()) return existing.get();
+        return repository.load(translation);
+    }
 
+    public EditorialMaterial createFresh(TranslationMaterial translation) throws Exception {
+        Objects.requireNonNull(translation, "translation");
         EditorialMaterial created = EditorialMaterialFactory.fromTranslation(translation);
         repository.save(created);
         cursorRepository.save(1, created.cues().size());
         return created;
+    }
+
+    public EditorialMaterial loadOrCreate(TranslationMaterial translation) throws Exception {
+        Optional<EditorialMaterial> existing = load(translation);
+        return existing.isPresent() ? existing.get() : createFresh(translation);
     }
 
     public EditorialMaterial saveDraft(
