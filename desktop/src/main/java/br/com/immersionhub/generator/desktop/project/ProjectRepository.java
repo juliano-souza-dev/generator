@@ -49,6 +49,7 @@ public final class ProjectRepository {
             for (Path dir : entries.filter(Files::isDirectory).toList()) {
                 Path json = dir.resolve(FILE_NAME);
                 if (!Files.isRegularFile(json)) continue;
+
                 try {
                     Snapshot snapshot = mapper.readValue(json.toFile(), Snapshot.class);
                     projects.add(snapshot.toProjectState());
@@ -137,6 +138,9 @@ public final class ProjectRepository {
                 && migratedStage == ProjectStage.PREPARATION
                 && completed.contains(ProjectStage.PREPARATION)) {
                 migratedStage = ProjectStage.TRANSLATION;
+            }
+            if (version < 3 && completed.contains(ProjectStage.TRANSLATION)) {
+                migratedStage = ProjectStage.EDITORIAL_REVIEW;
             }
 
             return new ProjectState(
