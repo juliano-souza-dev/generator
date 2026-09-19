@@ -28,8 +28,18 @@ public final class MaterialPreparationService {
         String id=PreparationIds.from(cut,pipelineVersion,asr.version());
         var cached=repository.load(id);
         if(cached.isPresent()) {
+            PreparedMaterial stored = cached.get();
+            PreparedMaterial rebound = new PreparedMaterial(
+                stored.id(),
+                stored.pipelineVersion(),
+                stored.asrVersion(),
+                cut,
+                stored.technicalAudio(),
+                stored.transcription(),
+                stored.createdAt()
+            );
             listener.accept(PreparationStage.TRANSCRIPTION_READY);
-            return cached.get();
+            return rebound;
         }
 
         listener.accept(PreparationStage.PREPARING_AUDIO);
