@@ -37,7 +37,12 @@ class EditorialReviewServiceTest {
         assertEquals(original.originalEn(), draft.originalEn());
         assertEquals(original.speechStartMs(), draft.speechStartMs());
         assertEquals(original.speechEndMs(), draft.speechEndMs());
-        assertEquals(original.words(), draft.words());
+        assertTrue(draft.words().stream().noneMatch(EditorialWord::timed));
+        assertEquals(1, edited.reconciliations().size());
+        EditorialReconciliation firstReconciliation = edited.reconciliations().getFirst();
+        assertEquals(0, firstReconciliation.preservedWords());
+        assertEquals(3, firstReconciliation.insertedWords());
+        assertEquals(3, firstReconciliation.removedWords());
 
         EditorialMaterial approved = service.approve(
             edited,
@@ -46,6 +51,7 @@ class EditorialReviewServiceTest {
             draft.pt()
         );
         assertEquals(EditorialReviewStatus.APPROVED, approved.cues().getFirst().reviewStatus());
+        assertEquals(1, approved.reconciliations().size());
 
         EditorialMaterial changedAgain = service.saveDraft(
             approved,
@@ -54,6 +60,11 @@ class EditorialReviewServiceTest {
             "Linha corrigida de novo"
         );
         assertEquals(EditorialReviewStatus.PENDING, changedAgain.cues().getFirst().reviewStatus());
+        assertEquals(2, changedAgain.reconciliations().size());
+        EditorialReconciliation secondReconciliation = changedAgain.reconciliations().getLast();
+        assertEquals(3, secondReconciliation.preservedWords());
+        assertEquals(1, secondReconciliation.insertedWords());
+        assertEquals(0, secondReconciliation.removedWords());
     }
 
     @Test
