@@ -18,7 +18,8 @@ class WhisperCppAsrEngineTest {
                   "text": "What are you gonna do?",
                   "tokens": [
                     {"text": "What", "offsets": {"from": 1240, "to": 1510}},
-                    {"text": "are", "offsets": {"from": 1510, "to": 1660}}
+                    {"text": "are", "offsets": {"from": 1510, "to": 1660}},
+                    {"text": "[_TT_143]", "offsets": {"from": 2860, "to": 2870}}
                   ]
                 }
               ]
@@ -32,5 +33,7 @@ class WhisperCppAsrEngineTest {
         assertEquals(1240, result.segments().getFirst().startMs());
         assertEquals(2860, result.segments().getFirst().endMs());
         assertEquals(1510, result.words().getFirst().endMs());
+        assertEquals(2, result.words().size());
+        assertTrue(result.words().stream().noneMatch(word -> word.text().startsWith("[_")));
     }
 }
