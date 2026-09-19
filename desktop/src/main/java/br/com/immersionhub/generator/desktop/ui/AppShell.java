@@ -22,6 +22,7 @@ public final class AppShell {
     private final Button preparationButton = navButton("Prepare");
     private final Button translationButton = navButton("Translation");
     private final Button reviewButton = navButton("Review");
+    private final Button wordReviewButton = navButton("Words");
     private final Button configButton = new Button("Config");
 
     public AppShell() {
@@ -32,6 +33,7 @@ public final class AppShell {
         setPreparationEnabled(false);
         setTranslationEnabled(false);
         setReviewEnabled(false);
+        setWordReviewEnabled(false);
     }
 
     public Parent root() { return root; }
@@ -60,6 +62,10 @@ public final class AppShell {
         reviewButton.setOnAction(event -> action.run());
     }
 
+    public void setWordReviewAction(Runnable action) {
+        wordReviewButton.setOnAction(event -> action.run());
+    }
+
     public void setConfigAction(Runnable action) {
         configButton.setOnAction(event -> action.run());
     }
@@ -80,15 +86,24 @@ public final class AppShell {
         reviewButton.setDisable(!enabled);
     }
 
+    public void setWordReviewEnabled(boolean enabled) {
+        wordReviewButton.setDisable(!enabled);
+    }
+
     public void show(Node content, ScreenId screen) {
         root.setCenter(content);
-        sectionLabel.setText(screen == ScreenId.EDITORIAL_REVIEW ? "REVIEW" : screen.name());
+        sectionLabel.setText(
+            screen == ScreenId.EDITORIAL_REVIEW ? "REVIEW"
+                : screen == ScreenId.WORD_REVIEW ? "WORDS"
+                : screen.name()
+        );
         setActive(homeButton, screen == ScreenId.HOME);
         setActive(sourceButton, screen == ScreenId.SOURCE);
         setActive(waveButton, screen == ScreenId.WAVE);
         setActive(preparationButton, screen == ScreenId.PREPARATION);
         setActive(translationButton, screen == ScreenId.TRANSLATION);
         setActive(reviewButton, screen == ScreenId.EDITORIAL_REVIEW);
+        setActive(wordReviewButton, screen == ScreenId.WORD_REVIEW);
     }
 
     private void setActive(Button button, boolean active) {
@@ -123,6 +138,7 @@ public final class AppShell {
         preparationButton.setMaxWidth(Double.MAX_VALUE);
         translationButton.setMaxWidth(Double.MAX_VALUE);
         reviewButton.setMaxWidth(Double.MAX_VALUE);
+        wordReviewButton.setMaxWidth(Double.MAX_VALUE);
 
         VBox sidebar = new VBox(
             8,
@@ -132,7 +148,8 @@ public final class AppShell {
             waveButton,
             preparationButton,
             translationButton,
-            reviewButton
+            reviewButton,
+            wordReviewButton
         );
         sidebar.setPadding(new Insets(22, 14, 22, 14));
         sidebar.setPrefWidth(200);
