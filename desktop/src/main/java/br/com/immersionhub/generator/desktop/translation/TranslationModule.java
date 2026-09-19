@@ -7,15 +7,20 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 public final class TranslationModule {
+    private static final GroqSettingsService SETTINGS = new GroqSettingsService(
+        new WindowsDpapiGroqCredentialStore(),
+        TranslationModule::validateKeyRemotely
+    );
+
     private TranslationModule() {}
 
-    public static TranslationService createService(String projectId, String sessionApiKey) {
+    public static TranslationService createService(String projectId) {
+        return createService(projectId, configuredApiKey().orElse(""));
+    }
+
+    static TranslationService createService(String projectId, String apiKey) {
         Path dir = directory(projectId);
-        String key = sessionApiKey == null ? "" : sessionApiKey.trim();
-        if (key.isEmpty()) {
-            String environment = System.getenv("GROQ_API_KEY");
-            key = environment == null ? "" : environment.trim();
-        }
+        String key = apiKey == null ? "" : apiKey.trim();
 
         TranslationLogger logger = new TranslationLogger(
             AppDirectories.logsDir().resolve("translation.log")
@@ -23,10 +28,8 @@ public final class TranslationModule {
 
         GroqClient groq = null;
         if (!key.isEmpty()) {
-            String model = System.getenv("IHUB_GROQ_MODEL");
-            if (model == null || model.isBlank()) model = GroqConfig.DEFAULT_MODEL;
             groq = new HttpGroqClient(
-                new GroqConfig(GroqConfig.DEFAULT_BASE_URI, key, model, 3),
+                new GroqConfig(GroqConfig.DEFAULT_BASE_URI, key, configuredModel(), 3),
                 logger::info
             );
         }
@@ -40,6 +43,26 @@ public final class TranslationModule {
             logger,
             dir
         );
+    }
+
+    public static boolean hasApiKey() {
+        return configuredApiKey().isPresent();
+    }
+
+    public static void validateAndStoreApiKey(String apiKey) throws Exception {
+        SETTINGS.validateAndSave(apiKey);
+    }
+
+    public static boolean authenticationFailure(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof GroqApiException api
+                && (api.statusCode() == 401 || api.statusCode() == 403)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     public static ExternalAiPackage prepareExternalPackage(
@@ -67,8 +90,24 @@ public final class TranslationModule {
         return AppDirectories.projectsDir().resolve(safe).resolve("translation");
     }
 
-    public static boolean environmentKeyAvailable() {
-        String key = System.getenv("GROQ_API_KEY");
-        return key != null && !key.isBlank();
+    private static Optional<String> configuredApiKey() {
+        Optional<String> stored = SETTINGS.apiKey();
+        if (stored.isPresent()) return stored;
+
+        String environment = System.getenv("GROQ_API_KEY");
+        if (environment == null || environment.isBlank()) return Optional.empty();
+        return Optional.of(environment.trim());
+    }
+
+    private static String configuredModel() {
+        String model = System.getenv("IHUB_GROQ_MODEL");
+        return model == null || model.isBlank() ? GroqConfig.DEFAULT_MODEL : model.trim();
+    }
+
+    private static void validateKeyRemotely(String apiKey) throws Exception {
+        HttpGroqClient client = new HttpGroqClient(
+            new GroqConfig(GroqConfig.DEFAULT_BASE_URI, apiKey, configuredModel(), 0)
+        );
+        client.modelInfo();
     }
 }
