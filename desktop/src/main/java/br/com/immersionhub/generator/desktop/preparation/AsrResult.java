@@ -14,15 +14,20 @@ public record AsrResult(String language, String text, List<TimedText> segments, 
     }
 
     public void validate(long durationMs) {
-        validateTimeline(segments, durationMs);
-        validateTimeline(words, durationMs);
+        validateTimeline("segment", segments, durationMs);
+        validateTimeline("word", words, durationMs);
     }
 
-    private static void validateTimeline(List<TimedText> items, long durationMs) {
+    private static void validateTimeline(String kind, List<TimedText> items, long durationMs) {
         long previousStart = -1;
-        for (TimedText item : items) {
+        for (int index = 0; index < items.size(); index++) {
+            TimedText item = items.get(index);
             if (item.endMs() > durationMs || item.startMs() < previousStart) {
-                throw new IllegalArgumentException("Timing fora da duração ou fora de ordem.");
+                throw new IllegalArgumentException(
+                    "Timing " + kind + "[" + index + "] inválido: startMs=" + item.startMs()
+                        + ", endMs=" + item.endMs() + ", durationMs=" + durationMs
+                        + ", previousStartMs=" + previousStart + "."
+                );
             }
             previousStart = item.startMs();
         }
