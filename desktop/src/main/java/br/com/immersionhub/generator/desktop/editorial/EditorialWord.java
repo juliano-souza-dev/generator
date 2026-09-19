@@ -50,6 +50,25 @@ public record EditorialWord(
         return startMs != null && endMs != null;
     }
 
+    public EditorialWord withReview(
+        String nextApprovedEn,
+        String nextPt,
+        EditorialReviewStatus nextStatus
+    ) {
+        return new EditorialWord(
+            index,
+            originalEn,
+            nextApprovedEn,
+            nextPt,
+            startMs,
+            endMs,
+            confidence,
+            semanticGroupId,
+            semanticGroupRole,
+            Objects.requireNonNull(nextStatus, "nextStatus")
+        );
+    }
+
     private static String requireText(String value, String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
         if (normalized.isEmpty()) throw new IllegalArgumentException(field + " não pode ser vazio.");
