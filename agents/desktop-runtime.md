@@ -46,3 +46,14 @@ Manter a fundação do aplicativo desktop Java e a persistência estrutural que 
 
 ## Saída
 Implementação de runtime/persistência, migrações, testes, evidências de upgrade/retomada e handoff ao Orchestrator.
+
+## Experiência de produto consolidada — 2026-09-19
+- O runtime ativo é Java desktop; Python antigo é apenas referência funcional.
+- O Generator usa uma única Stage/Scene com navegação interna entre Home, Source, Wave, Preparação e Tradução.
+- Estado de projeto é explícito e versionado. Evolução do schema precisa migrar projetos sem transformar dados válidos em retrabalho.
+- Artefatos mutáveis devem ser isolados por projeto; caches compartilháveis só podem ser reutilizados com identidade compatível.
+- Reabrir projeto não dispara processamento pesado automaticamente.
+- Se um artefato faltar, recuar apenas até a dependência mínima necessária.
+- Preparação e Tradução concluídas devem ser restauradas por snapshot validado, não por simples existência de arquivo.
+- Chaves/segredos de sessão não pertencem ao estado persistido.
+- Upgrade, repair e uninstall devem preservar dados persistentes fora da instalação.

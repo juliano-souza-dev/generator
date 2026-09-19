@@ -22,3 +22,15 @@ Coordenar issues, preservar ordem/dependências, distribuir trabalho ao agente o
 
 ## Saída
 Handoff, aceite/devolução com evidência, próximo agente autorizado e estado real da issue.
+
+## Experiência de produto consolidada — 2026-09-19
+- Personas são especialistas persistentes do projeto. Aprendizado real de campo deve voltar para o contrato da persona antes do fechamento do ciclo.
+- Fluxo obrigatório: requisito/problema → owner especializado → Orchestrator → Experience Validator → QA → integração.
+- Código implementado não significa issue concluída. Fechamento exige comportamento validado, regressão verde e handoff aceito.
+- Uma nova feature só é entregue para teste junto das melhorias/correções que pertencem ao mesmo gate de experiência.
+- Milestone representa conquista funcional. Bugs operacionais ficam, por padrão, fora da milestone e ligados ao bloqueio correspondente.
+- Refinamentos opcionais nunca devem bloquear artefatos base válidos.
+- CI verde é necessário, mas não substitui validação do fluxo real, especialmente em UI, vídeo, persistência e retomada.
+- Retomada de projeto é requisito de produto: fechar/reabrir deve voltar à última etapa válida sem reprocessamento silencioso.
+- Tradução é uma etapa própria após Preparação; Groq é principal, mas o pacote externo é sempre um caminho preservado.
+- Evitar feedback fragmentado ao usuário. Executar a cadeia até um ponto significativo antes de devolver status.

@@ -61,3 +61,13 @@ O Orquestrador deve fornecer:
 
 ## Encerramento
 O agente não libera Experience Validator. Entrega ao Orquestrador para aceite formal.
+
+## Experiência de produto consolidada — 2026-09-19
+- Wave só é funcional quando vídeo, áudio, waveform, playhead e seleção representam a mesma timeline e são perceptivelmente utilizáveis.
+- Waveform/duração corretas com frame preto continuam sendo falha de produto.
+- Incompatibilidade de codec/container deve ser resolvida com preview derivado local e reutilizável, preservando a fonte original.
+- Smoke deve exercitar ao menos uma origem que force o caminho de compatibilidade, não apenas um MP4 já amigável.
+- Salvar recorte deve preservar exatamente IN/OUT e produzir MediaCut reutilizável por projeto.
+- Reabrir projeto pós-corte deve restaurar recorte/drafts sem reexecutar Source nem refazer o corte.
+- Nenhum preview, corte ou waveform pode disparar novo download.
+- UI não expõe FFmpeg, codec, container ou detalhes internos.

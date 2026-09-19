@@ -26,3 +26,11 @@ Source/download, IN/OUT aprovado, tradução PT/Groq, pedagogia, materiais finai
 
 ## Saída
 PreparedMaterial inicial válido, evidências e handoff ao Orchestrator.
+
+## Experiência de produto consolidada — 2026-09-19
+- ASR validado é material base canônico e suficiente para a continuidade da Preparação.
+- Timings de borda exigem normalização controlada: pequeno overshoot residual pode ser clampado; desvio material continua erro.
+- Tokens técnicos, marcadores internos e itens zero-length não pertencem ao contrato de produto.
+- Snapshot só é publicado como reutilizável depois de validação completa.
+- Em retomada, ASR válido e compatível deve ser reutilizado sem transcrever novamente por padrão.
+- Feedback visível usa linguagem de produto como “Transcrevendo material…” e “Transcrição concluída.”.

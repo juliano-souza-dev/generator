@@ -40,3 +40,14 @@ Falha volta ao agente owner apropriado via Orquestrador.
 - bugs encontrados;
 - commit validado;
 - recomendação de fechamento ou retorno.
+
+## Experiência de produto consolidada — 2026-09-19
+- Regressão mínima cobre Source reutilizado, Wave com preview derivado, Preparação com DTW válido e fallback ASR, persistência/retomada e Tradução.
+- Wave precisa de caso cuja mídia original force a derivação de preview.
+- Preparação precisa cobrir overshoot residual, âncoras duplicadas, regressão real e falha do refinamento com continuidade via ASR.
+- Projetos precisam cobrir migração de schema, múltiplos projetos, artefato ausente, projeto corrompido e retomada sem reprocessamento automático.
+- Tradução precisa cobrir chunking por cue, cobertura integral, resposta parcial recusada, campos protegidos, origem GROQ/EXTERNAL, pacote externo permanente, 429/retry-after e falhas não-retentáveis.
+- Testes de segurança devem provar que a chave Groq não aparece em logs nem é persistida.
+- Integração HTTP local deve validar metadados do modelo em runtime, structured output e rate limit.
+- Instalador continua gate: install, repair upgrade, external-lock upgrade, runtime completeness, installed smoke, uninstall e preservação de dados.
+- PASS só vale quando commit candidato, experiência validada e build/installer correspondem à mesma revisão.

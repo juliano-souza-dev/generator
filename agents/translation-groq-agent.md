@@ -68,3 +68,16 @@ Implementação, testes de completude/chunking/rate-limit/fallback, evidências,
 - A chave Groq é somente de sessão/ambiente e nunca é escrita em projeto, snapshot ou log.
 - Retorno externo e retorno Groq convergem no mesmo TranslationMaterial validado; campos de timing/texto protegido continuam sob autoridade local.
 - Falha 400/401/403 não entra em loop de retry; 408/429/5xx têm retry limitado, com `retry-after` quando disponível.
+
+## Experiência de produto consolidada — 2026-09-19
+- Tradução é uma etapa própria: Preparação concluída → Tradução.
+- Groq é caminho principal, mas nunca gate único. Processamento externo permanece disponível quando Groq falha, fica parcial ou atinge limites.
+- O pacote externo é criado antes da tentativa Groq e continua disponível mesmo após sucesso automático.
+- Nesta etapa, o pacote externo contém o áudio técnico preparado e a instrução/contrato completo de retorno JSON.
+- Retorno Groq e retorno externo convergem no mesmo TranslationMaterial validado.
+- IDs, ordem, EN aprovado, words e timings são protegidos pelo Generator; somente conteúdo autorizado da tradução pode mudar.
+- Nenhum chunk parcial vira resultado final. Publicação é integral e validada.
+- Contexto e rate limits vêm do modelo/headers reais; não congelar limites públicos como regra de produto.
+- Retry é conservador: 408/429/5xx podem repetir com espera; 400/401/403 e violações de contrato não entram em loop.
+- Chave Groq é de sessão/ambiente, nunca persistida nem logada.
+- UI fala em “Traduzindo material”, “Traduções prontas” e “opção externa”; modelo, endpoint, tokens e retries ficam no log técnico.
