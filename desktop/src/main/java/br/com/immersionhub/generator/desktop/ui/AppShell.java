@@ -21,6 +21,7 @@ public final class AppShell {
     private final Button waveButton = navButton("Wave");
     private final Button preparationButton = navButton("Prepare");
     private final Button translationButton = navButton("Translation");
+    private final Button configButton = new Button("Config");
 
     public AppShell() {
         root.getStyleClass().add("app-root");
@@ -51,6 +52,10 @@ public final class AppShell {
 
     public void setTranslationAction(Runnable action) {
         translationButton.setOnAction(event -> action.run());
+    }
+
+    public void setConfigAction(Runnable action) {
+        configButton.setOnAction(event -> action.run());
     }
 
     public void setWaveEnabled(boolean enabled) {
@@ -87,8 +92,10 @@ public final class AppShell {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
+        configButton.getStyleClass().add("secondary-button");
         sectionLabel.getStyleClass().add("section-label");
-        HBox bar = new HBox(16, product, spacer, sectionLabel);
+
+        HBox bar = new HBox(12, product, spacer, configButton, sectionLabel);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(16, 22, 16, 22));
         bar.getStyleClass().add("top-bar");
