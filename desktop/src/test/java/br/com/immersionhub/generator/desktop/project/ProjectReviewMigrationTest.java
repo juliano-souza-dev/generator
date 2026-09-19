@@ -44,9 +44,13 @@ class ProjectReviewMigrationTest {
         repository.save(current);
 
         Path json = repository.projectDirectory(current.projectId()).resolve("project.json");
+        String quote = Character.toString(34);
         String legacyV2 = Files.readString(json)
-            .replace("\\\"schemaVersion\\\" : 3", "\\\"schemaVersion\\\" : 2")
-            .replace("\\\"currentStage\\\" : \\\"EDITORIAL_REVIEW\\\"", "\\\"currentStage\\\" : \\\"TRANSLATION\\\"");
+            .replace(quote + "schemaVersion" + quote + " : 3", quote + "schemaVersion" + quote + " : 2")
+            .replace(
+                quote + "currentStage" + quote + " : " + quote + "EDITORIAL_REVIEW" + quote,
+                quote + "currentStage" + quote + " : " + quote + "TRANSLATION" + quote
+            );
         Files.writeString(json, legacyV2);
 
         ProjectState migrated = repository.list().projects().getFirst();
