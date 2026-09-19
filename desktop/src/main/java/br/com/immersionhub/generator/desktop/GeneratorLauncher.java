@@ -27,7 +27,8 @@ public final class GeneratorLauncher {
             if (ScreenId.SOURCE == null
                 || ScreenId.WAVE == null
                 || ScreenId.PREPARATION == null
-                || ScreenId.TRANSLATION == null) {
+                || ScreenId.TRANSLATION == null
+                || ScreenId.EDITORIAL_REVIEW == null) {
                 throw new IllegalStateException("Desktop navigation contract unavailable.");
             }
             return;
