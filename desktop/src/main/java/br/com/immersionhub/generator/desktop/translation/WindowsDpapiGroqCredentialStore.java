@@ -15,20 +15,19 @@ import java.util.concurrent.TimeUnit;
 public final class WindowsDpapiGroqCredentialStore implements GroqCredentialStore {
     private static final String PROTECT_SCRIPT = """
         $payload = [Console]::In.ReadToEnd()
-        $bytes = [Text.Encoding]::UTF8.GetBytes($payload)
-        $protected = [Security.Cryptography.ProtectedData]::Protect(
-            $bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser
-        )
-        [Console]::Out.Write([Convert]::ToBase64String($protected))
+        $secure = ConvertTo-SecureString -String $payload -AsPlainText -Force
+        [Console]::Out.Write((ConvertFrom-SecureString -SecureString $secure))
         """;
 
     private static final String UNPROTECT_SCRIPT = """
         $payload = [Console]::In.ReadToEnd().Trim()
-        $protected = [Convert]::FromBase64String($payload)
-        $bytes = [Security.Cryptography.ProtectedData]::Unprotect(
-            $protected, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser
-        )
-        [Console]::Out.Write([Text.Encoding]::UTF8.GetString($bytes))
+        $secure = ConvertTo-SecureString -String $payload
+        $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        try {
+            [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer))
+        } finally {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+        }
         """;
 
     private final Path credentialFile;
