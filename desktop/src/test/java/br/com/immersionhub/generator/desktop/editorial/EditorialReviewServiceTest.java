@@ -85,6 +85,11 @@ class EditorialReviewServiceTest {
         assertEquals(translation.cues().getFirst().approvedEn(), restored.approvedEn());
         assertEquals(translation.cues().getFirst().pt(), restored.pt());
         assertEquals(EditorialReviewStatus.PENDING, restored.reviewStatus());
+        assertTrue(restored.words().stream().allMatch(EditorialWord::timed));
+        assertEquals(
+            EditorialReconciliationReason.RESTORE_TRANSLATION_SUGGESTION,
+            material.reconciliations().getLast().reason()
+        );
     }
 
     @Test
