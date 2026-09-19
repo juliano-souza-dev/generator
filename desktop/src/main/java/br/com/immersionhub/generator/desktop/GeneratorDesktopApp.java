@@ -27,6 +27,6 @@ public final class GeneratorDesktopApp extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        navigation.showSource();
+        navigation.showHome();
     }
 }
