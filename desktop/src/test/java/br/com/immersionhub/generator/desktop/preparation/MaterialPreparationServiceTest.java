@@ -20,6 +20,38 @@ class MaterialPreparationServiceTest {
    assertEquals(service.prepare(cut).id(),service.prepare(cut).id());
    assertEquals(2,calls[0]);
  }
+ @Test void rebindsCachedPreparationToCurrentProjectCut() throws Exception {
+   Path d=Files.createTempDirectory("prep-rebind");
+   Path s=Files.writeString(d.resolve("source.mp4"),"s");
+   Path cutAPath=Files.writeString(d.resolve("project-a-cut.mp4"),"a");
+   Path cutBPath=Files.writeString(d.resolve("project-b-cut.mp4"),"b");
+   Path wav=Files.writeString(d.resolve("a.wav"),"a");
+   MediaCut cutA=new MediaCut("id",s,cutAPath,0,100,100,Instant.EPOCH);
+   MediaCut cutB=new MediaCut("id",s,cutBPath,0,100,100,Instant.EPOCH);
+
+   Map<String,PreparedMaterial> db=new HashMap<>();
+   PreparedMaterialRepository repo=new PreparedMaterialRepository(){
+     public Optional<PreparedMaterial> load(String id){return Optional.ofNullable(db.get(id));}
+     public void save(PreparedMaterial m){db.put(m.id(),m);}
+   };
+   int[] calls={0};
+   AsrEngine asr=new AsrEngine(){
+     public AsrResult transcribeEnglish(Path p){
+       calls[0]++;
+       return new AsrResult("en","hi",List.of(new TimedText("hi",0,100)),List.of(new TimedText("hi",0,100)));
+     }
+     public String version(){return "w1";}
+   };
+   MaterialPreparationService service=new MaterialPreparationService((mc,out)->wav,asr,repo,d,"p1");
+
+   PreparedMaterial first=service.prepare(cutA);
+   PreparedMaterial second=service.prepare(cutB);
+
+   assertEquals(cutAPath.toAbsolutePath().normalize(),first.mediaCut().outputPath());
+   assertEquals(cutBPath.toAbsolutePath().normalize(),second.mediaCut().outputPath());
+   assertEquals(first.id(),second.id());
+   assertEquals(1,calls[0]);
+ }
  @Test void normalizesResidualEndOvershootBeforePublishing() throws Exception {
    Path d=Files.createTempDirectory("prep-boundary"); Path s=Files.writeString(d.resolve("source.mp4"),"s"); Path c=Files.writeString(d.resolve("cut.mp4"),"c"); Path wav=Files.writeString(d.resolve("a.wav"),"a");
    MediaCut cut=new MediaCut("real-case",s,c,12818,147000,134182,Instant.EPOCH);
