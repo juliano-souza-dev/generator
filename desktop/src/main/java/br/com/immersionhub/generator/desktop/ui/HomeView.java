@@ -78,11 +78,7 @@ public final class HomeView {
         Label name = new Label(project.title());
         name.getStyleClass().add("project-card-title");
 
-        String stageText = project.preparationCompleted()
-            ? "Preparação concluída"
-            : "Etapa atual · " + project.minimumResumeStage().userLabel();
-
-        Label stage = new Label(stageText);
+        Label stage = new Label("Etapa atual · " + project.minimumResumeStage().userLabel());
         stage.getStyleClass().add("page-copy");
 
         Label updated = new Label("Última atividade · " + DATE.format(project.updatedAt()));
