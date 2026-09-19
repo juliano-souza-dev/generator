@@ -230,6 +230,29 @@ public record ProjectState(
         }
     }
 
+    public ProjectStageStatus stageStatus(ProjectStage stage) {
+        Objects.requireNonNull(stage, "stage");
+
+        if (stage == ProjectStage.SOURCE && completedStages.contains(stage) && sourceMedia().isEmpty()) {
+            return ProjectStageStatus.NEEDS_REPROCESSING;
+        }
+        if (stage == ProjectStage.WAVE && completedStages.contains(stage) && mediaCut().isEmpty()) {
+            return ProjectStageStatus.NEEDS_REPROCESSING;
+        }
+        if (stage == ProjectStage.PREPARATION
+            && completedStages.contains(stage)
+            && !preparationCompleted()) {
+            return ProjectStageStatus.NEEDS_REPROCESSING;
+        }
+        if (completedStages.contains(stage)) {
+            return ProjectStageStatus.COMPLETED;
+        }
+        if (currentStage == stage) {
+            return ProjectStageStatus.IN_PROGRESS;
+        }
+        return ProjectStageStatus.NOT_STARTED;
+    }
+
     public ProjectStage minimumResumeStage() {
         if (sourceMedia().isEmpty()) return ProjectStage.SOURCE;
         if (currentStage == ProjectStage.SOURCE) return ProjectStage.SOURCE;
