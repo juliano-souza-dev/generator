@@ -13,8 +13,9 @@ public final class TranslationChunker {
     public List<List<TranslationCue>> chunk(TranslationMaterial material, GroqModelInfo model) {
         long context = model.contextWindow();
         long maxCompletion = Math.min(model.maxCompletionTokens(), Math.max(1024L, context / 3L));
-        long safeTotal = Math.max(2048L, (long) Math.floor(context * 0.72d));
-        long maxPrompt = Math.max(1024L, safeTotal - Math.min(maxCompletion, safeTotal / 2L));
+        long safeTotal = Math.max(512L, (long) Math.floor(context * 0.72d));
+        safeTotal = Math.min(context, safeTotal);
+        long maxPrompt = Math.max(256L, safeTotal - Math.min(maxCompletion, safeTotal / 2L));
 
         List<List<TranslationCue>> chunks = new ArrayList<>();
         List<TranslationCue> current = new ArrayList<>();
