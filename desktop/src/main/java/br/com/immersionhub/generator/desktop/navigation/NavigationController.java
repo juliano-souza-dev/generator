@@ -3,6 +3,8 @@ package br.com.immersionhub.generator.desktop.navigation;
 import br.com.immersionhub.generator.desktop.editorial.EditorialMaterial;
 import br.com.immersionhub.generator.desktop.editorial.EditorialModule;
 import br.com.immersionhub.generator.desktop.editorial.EditorialReviewService;
+import br.com.immersionhub.generator.desktop.editorial.WordReviewPosition;
+import br.com.immersionhub.generator.desktop.editorial.WordReviewService;
 import br.com.immersionhub.generator.desktop.model.MediaCut;
 import br.com.immersionhub.generator.desktop.model.SourceMedia;
 import br.com.immersionhub.generator.desktop.preparation.AlignedMaterial;
@@ -27,6 +29,7 @@ import br.com.immersionhub.generator.desktop.ui.PreparationView;
 import br.com.immersionhub.generator.desktop.ui.SourceView;
 import br.com.immersionhub.generator.desktop.ui.TranslationView;
 import br.com.immersionhub.generator.desktop.ui.WaveView;
+import br.com.immersionhub.generator.desktop.ui.WordReviewView;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.stage.Window;
@@ -48,6 +51,8 @@ public final class NavigationController {
     private EditorialReviewService editorialReviewService;
     private EditorialMaterial editorialMaterial;
     private int editorialCueOrder = 1;
+    private WordReviewService wordReviewService;
+    private WordReviewPosition wordReviewPosition;
 
     private boolean preparationAutoStart;
     private boolean preparationNeedsRecovery;
@@ -73,6 +78,12 @@ public final class NavigationController {
         });
         shell.setReviewAction(() -> {
             if (translationMaterial != null) state.navigate(ScreenId.EDITORIAL_REVIEW);
+        });
+        shell.setWordReviewAction(() -> {
+            if (editorialMaterial != null && editorialMaterial.cuesApproved()) {
+                ensureWordReviewInitialized();
+                state.navigate(ScreenId.WORD_REVIEW);
+            }
         });
         shell.setConfigAction(this::openGroqConfig);
 
@@ -161,7 +172,14 @@ public final class NavigationController {
             case WAVE -> state.navigate(ScreenId.WAVE);
             case PREPARATION -> state.navigate(ScreenId.PREPARATION);
             case TRANSLATION -> state.navigate(ScreenId.TRANSLATION);
-            case EDITORIAL_REVIEW -> state.navigate(ScreenId.EDITORIAL_REVIEW);
+            case EDITORIAL_REVIEW -> {
+                if (editorialMaterial != null && editorialMaterial.cuesApproved()) {
+                    ensureWordReviewInitialized();
+                    state.navigate(ScreenId.WORD_REVIEW);
+                } else {
+                    state.navigate(ScreenId.EDITORIAL_REVIEW);
+                }
+            }
         }
     }
 
@@ -265,18 +283,40 @@ public final class NavigationController {
     private void acceptEditorialProgress(EditorialMaterial material, Integer cueOrder) {
         editorialMaterial = material;
         editorialCueOrder = cueOrder == null ? 1 : cueOrder;
+        wordReviewPosition = null;
+
+        if (editorialMaterial.cuesApproved()) {
+            ensureWordReviewInitialized();
+        } else {
+            wordReviewService = null;
+        }
 
         if (projectState != null) {
             ProjectState next = projectState.withEditorialActivity();
             persist(next);
             projectState = next;
         }
+        refreshNavigationAvailability();
+    }
+
+    private void acceptWordReviewProgress(EditorialMaterial material, WordReviewPosition position) {
+        editorialMaterial = material;
+        wordReviewPosition = position;
+
+        if (projectState != null) {
+            ProjectState next = projectState.withEditorialActivity();
+            persist(next);
+            projectState = next;
+        }
+        refreshNavigationAvailability();
     }
 
     private void initializeEditorialReview() {
         editorialReviewService = null;
         editorialMaterial = null;
         editorialCueOrder = 1;
+        wordReviewService = null;
+        wordReviewPosition = null;
         editorialNeedsRecovery = false;
 
         if (projectState == null || translationMaterial == null) return;
@@ -285,10 +325,27 @@ public final class NavigationController {
             editorialReviewService = EditorialModule.createService(projectState.projectId());
             editorialMaterial = editorialReviewService.loadOrCreate(translationMaterial);
             editorialCueOrder = editorialReviewService.loadCursor(editorialMaterial);
+            if (editorialMaterial.cuesApproved()) {
+                ensureWordReviewInitialized();
+            }
         } catch (Exception exception) {
             editorialMaterial = null;
             editorialCueOrder = 1;
             editorialNeedsRecovery = true;
+        }
+    }
+
+    private void ensureWordReviewInitialized() {
+        if (projectState == null || editorialMaterial == null || !editorialMaterial.cuesApproved()) {
+            wordReviewService = null;
+            wordReviewPosition = null;
+            return;
+        }
+        if (wordReviewService == null) {
+            wordReviewService = EditorialModule.createWordReviewService(projectState.projectId());
+        }
+        if (wordReviewPosition == null) {
+            wordReviewPosition = wordReviewService.loadCursor(editorialMaterial);
         }
     }
 
@@ -302,6 +359,8 @@ public final class NavigationController {
         editorialReviewService = null;
         editorialMaterial = null;
         editorialCueOrder = 1;
+        wordReviewService = null;
+        wordReviewPosition = null;
         editorialNeedsRecovery = false;
     }
 
@@ -346,6 +405,7 @@ public final class NavigationController {
         shell.setPreparationEnabled(mediaCut != null);
         shell.setTranslationEnabled(alignedMaterial != null);
         shell.setReviewEnabled(translationMaterial != null);
+        shell.setWordReviewEnabled(editorialMaterial != null && editorialMaterial.cuesApproved());
     }
 
     private void render(ScreenId screen) {
@@ -411,7 +471,7 @@ public final class NavigationController {
                     this::openGroqConfig
                 ).root();
             }
-        } else {
+        } else if (screen == ScreenId.EDITORIAL_REVIEW) {
             if (translationMaterial == null || projectState == null || mediaCut == null) {
                 shown = ScreenId.TRANSLATION;
                 if (alignedMaterial == null || projectState == null) {
@@ -449,6 +509,35 @@ public final class NavigationController {
                     mediaCut.outputPath(),
                     this::acceptEditorialProgress,
                     () -> state.navigate(ScreenId.TRANSLATION)
+                ).root();
+            }
+        } else {
+            if (editorialMaterial == null || !editorialMaterial.cuesApproved()) {
+                shown = ScreenId.EDITORIAL_REVIEW;
+                if (translationMaterial == null || editorialReviewService == null) {
+                    content = new EditorialReviewUnavailableView(
+                        this::retryEditorialReview,
+                        () -> state.navigate(ScreenId.TRANSLATION)
+                    ).root();
+                } else {
+                    content = new EditorialReviewView(
+                        editorialReviewService,
+                        translationMaterial,
+                        editorialMaterial,
+                        editorialCueOrder,
+                        mediaCut.outputPath(),
+                        this::acceptEditorialProgress,
+                        () -> state.navigate(ScreenId.TRANSLATION)
+                    ).root();
+                }
+            } else {
+                ensureWordReviewInitialized();
+                content = new WordReviewView(
+                    wordReviewService,
+                    editorialMaterial,
+                    wordReviewPosition,
+                    this::acceptWordReviewProgress,
+                    () -> state.navigate(ScreenId.EDITORIAL_REVIEW)
                 ).root();
             }
         }
