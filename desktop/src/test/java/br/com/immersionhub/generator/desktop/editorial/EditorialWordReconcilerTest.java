@@ -108,7 +108,7 @@ class EditorialWordReconcilerTest {
 
         assertEquals("", really.semanticGroupId());
         assertEquals(SemanticGroupRole.NONE, really.semanticGroupRole());
-        assertEquals("", really.pt());
+        assertEquals("intensificador", really.pt());
         assertEquals(EditorialReviewStatus.PENDING, really.reviewStatus());
 
         assertEquals("", like.semanticGroupId());

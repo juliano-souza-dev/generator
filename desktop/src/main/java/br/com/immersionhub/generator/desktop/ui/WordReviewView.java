@@ -3,7 +3,7 @@ package br.com.immersionhub.generator.desktop.ui;
 import br.com.immersionhub.generator.desktop.editorial.EditorialCue;
 import br.com.immersionhub.generator.desktop.editorial.EditorialMaterial;
 import br.com.immersionhub.generator.desktop.editorial.EditorialReviewStatus;
-import br.com.immersionhub.generator.desktop.editorial.EditorialWord;
+import br.com.immersionhub.generator.desktop.editorial.WordReviewMutation;
 import br.com.immersionhub.generator.desktop.editorial.WordReviewPosition;
 import br.com.immersionhub.generator.desktop.editorial.WordReviewService;
 import javafx.geometry.Insets;
@@ -33,6 +33,7 @@ public final class WordReviewView {
     private final Label progressLabel = new Label();
     private final Label cueProgressLabel = new Label();
     private final Label reviewState = new Label();
+    private final Label groupState = new Label();
     private final Label status = new Label();
 
     private final TextArea cueContext = readOnlyArea();
@@ -43,6 +44,9 @@ public final class WordReviewView {
     private final Button previous = secondary("← Anterior");
     private final Button next = secondary("Próxima →");
     private final Button nextPending = secondary("Próxima pendente");
+    private final Button groupPrevious = secondary("Agrupar com anterior");
+    private final Button groupNext = secondary("Agrupar com próxima");
+    private final Button ungroup = secondary("Desagrupar");
     private final Button save = secondary("Salvar");
     private final Button approve = new Button("Aprovar");
 
@@ -71,13 +75,14 @@ public final class WordReviewView {
         title.getStyleClass().add("page-title");
 
         Label copy = new Label(
-            "Revise uma unidade por vez. Para trocar a palavra em English, volte à revisão da cue; aqui você preserva a estrutura já reconciliada."
+            "Revise palavras ou unidades semânticas. Você pode agrupar unidades vizinhas sem alterar a ordem da cue."
         );
         copy.getStyleClass().add("page-copy");
         copy.setWrapText(true);
 
         progressLabel.getStyleClass().add("review-progress");
         cueProgressLabel.getStyleClass().add("project-card-meta");
+        groupState.getStyleClass().add("project-card-meta");
         reviewState.getStyleClass().add("review-state");
         status.getStyleClass().add("page-copy");
         status.setWrapText(true);
@@ -87,8 +92,11 @@ public final class WordReviewView {
         previous.setOnAction(event -> navigate(service.previous(material, position)));
         next.setOnAction(event -> navigate(service.next(material, position)));
         nextPending.setOnAction(event -> navigateToNextPending());
+        groupPrevious.setOnAction(event -> groupWithPrevious());
+        groupNext.setOnAction(event -> groupWithNext());
+        ungroup.setOnAction(event -> ungroup());
         save.setOnAction(event -> saveDraft());
-        approve.setOnAction(event -> approveWord());
+        approve.setOnAction(event -> approveUnit());
 
         english.textProperty().addListener((obs, oldValue, newValue) -> markDirtyIfNeeded());
         pt.textProperty().addListener((obs, oldValue, newValue) -> markDirtyIfNeeded());
@@ -100,6 +108,9 @@ public final class WordReviewView {
 
         HBox nav = new HBox(8, previous, next, nextPending);
         nav.setAlignment(Pos.CENTER_LEFT);
+
+        HBox grouping = new HBox(8, groupPrevious, groupNext, ungroup);
+        grouping.setAlignment(Pos.CENTER_LEFT);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -117,7 +128,9 @@ public final class WordReviewView {
             copy,
             new HBox(12, progressLabel, reviewState),
             cueProgressLabel,
+            groupState,
             nav,
+            grouping,
             contextBox,
             originalBox,
             englishBox,
@@ -142,17 +155,12 @@ public final class WordReviewView {
     private void load(WordReviewPosition nextPosition) {
         position = nextPosition;
         EditorialCue cue = currentCue();
-        EditorialWord word = currentWord();
 
         loadingFields = true;
         cueContext.setText(cue.approvedEn() + System.lineSeparator() + cue.pt());
-        originalReference.setText(
-            word.originalEn().isBlank()
-                ? "Nova unidade da revisão editorial"
-                : word.originalEn()
-        );
-        english.setText(word.approvedEn());
-        pt.setText(word.pt());
+        originalReference.setText(service.unitOriginalReference(material, position));
+        english.setText(service.unitEnglish(material, position));
+        pt.setText(service.unitPt(material, position));
         loadingFields = false;
 
         try {
@@ -198,7 +206,7 @@ public final class WordReviewView {
         }
     }
 
-    private void approveWord() {
+    private void approveUnit() {
         try {
             material = service.approve(
                 material,
@@ -222,12 +230,49 @@ public final class WordReviewView {
         }
     }
 
+    private void groupWithPrevious() {
+        if (!persistDraftIfChanged()) return;
+        try {
+            applyMutation(service.groupWithPrevious(material, position));
+            status.setText("Unidades agrupadas. Revise e aprove a tradução do grupo.");
+        } catch (Exception exception) {
+            status.setText("Não foi possível agrupar com a unidade anterior.");
+        }
+    }
+
+    private void groupWithNext() {
+        if (!persistDraftIfChanged()) return;
+        try {
+            applyMutation(service.groupWithNext(material, position));
+            status.setText("Unidades agrupadas. Revise e aprove a tradução do grupo.");
+        } catch (Exception exception) {
+            status.setText("Não foi possível agrupar com a próxima unidade.");
+        }
+    }
+
+    private void ungroup() {
+        if (!persistDraftIfChanged()) return;
+        try {
+            applyMutation(service.ungroup(material, position));
+            status.setText("Grupo desfeito. As traduções individuais conhecidas foram restauradas.");
+        } catch (Exception exception) {
+            status.setText("Esta unidade não pode ser desagrupada.");
+        }
+    }
+
+    private void applyMutation(WordReviewMutation mutation) {
+        material = mutation.material();
+        position = mutation.position();
+        progressAction.accept(material, position);
+        load(position);
+    }
+
     private boolean persistDraftIfChanged() {
-        EditorialWord word = currentWord();
         String nextEn = normalized(english.getText());
         String nextPt = normalized(pt.getText());
 
-        if (nextEn.equals(word.approvedEn()) && nextPt.equals(word.pt())) {
+        if (nextEn.equals(service.unitEnglish(material, position))
+            && nextPt.equals(service.unitPt(material, position))) {
             return true;
         }
 
@@ -243,16 +288,15 @@ public final class WordReviewView {
 
     private void markDirtyIfNeeded() {
         if (loadingFields) return;
-        EditorialWord word = currentWord();
-        boolean changed = !normalized(english.getText()).equals(word.approvedEn())
-            || !normalized(pt.getText()).equals(word.pt());
+        boolean changed = !normalized(english.getText()).equals(service.unitEnglish(material, position))
+            || !normalized(pt.getText()).equals(service.unitPt(material, position));
 
         if (changed) {
             reviewState.setText("Alterada · pendente");
             reviewState.getStyleClass().removeAll("review-approved", "review-pending");
             reviewState.getStyleClass().add("review-pending");
         } else {
-            updateReviewState(word);
+            updateReviewState();
         }
     }
 
@@ -260,13 +304,10 @@ public final class WordReviewView {
         long approved = service.approvedCount(material);
         int total = service.totalCount(material);
         EditorialCue cue = currentCue();
-        long cueApproved = cue.words().stream()
-            .filter(word -> word.reviewStatus() == EditorialReviewStatus.APPROVED)
-            .count();
 
         progressLabel.setText(
             "Unidade %d · %d de %d aprovadas".formatted(
-                absolutePosition(),
+                service.ordinal(material, position),
                 approved,
                 total
             )
@@ -275,42 +316,36 @@ public final class WordReviewView {
             "Cue %d de %d · %d de %d unidades aprovadas".formatted(
                 cue.order(),
                 material.cues().size(),
-                cueApproved,
-                cue.words().size()
+                service.cueApprovedCount(material, cue.order()),
+                service.cueTotalCount(material, cue.order())
             )
         );
-        updateReviewState(currentWord());
+
+        int size = service.unitSize(material, position);
+        groupState.setText(
+            size > 1
+                ? "Unidade semântica · " + size + " palavras"
+                : "Unidade individual"
+        );
+
+        updateReviewState();
         previous.setDisable(service.previous(material, position).isEmpty());
         next.setDisable(service.next(material, position).isEmpty());
         nextPending.setDisable(approved == total);
+        groupPrevious.setDisable(!service.canGroupPrevious(material, position));
+        groupNext.setDisable(!service.canGroupNext(material, position));
+        ungroup.setDisable(!service.isGrouped(material, position));
     }
 
-    private void updateReviewState(EditorialWord word) {
-        boolean approved = word.reviewStatus() == EditorialReviewStatus.APPROVED;
+    private void updateReviewState() {
+        boolean approved = service.unitStatus(material, position) == EditorialReviewStatus.APPROVED;
         reviewState.setText(approved ? "Aprovada" : "Pendente");
         reviewState.getStyleClass().removeAll("review-approved", "review-pending");
         reviewState.getStyleClass().add(approved ? "review-approved" : "review-pending");
     }
 
-    private int absolutePosition() {
-        int count = 0;
-        for (EditorialCue cue : material.cues()) {
-            for (EditorialWord word : cue.words()) {
-                count++;
-                if (cue.order() == position.cueOrder() && word.index() == position.wordIndex()) {
-                    return count;
-                }
-            }
-        }
-        return 1;
-    }
-
     private EditorialCue currentCue() {
         return material.cues().get(position.cueOrder() - 1);
-    }
-
-    private EditorialWord currentWord() {
-        return currentCue().words().get(position.wordIndex() - 1);
     }
 
     private static VBox field(String labelText, TextArea area) {
@@ -349,7 +384,7 @@ public final class WordReviewView {
     private static String productMessage(Exception exception) {
         String message = exception.getMessage();
         if (message != null && message.contains("volte para a revisão da cue")) {
-            return "Para trocar a palavra em English, volte para a revisão da cue.";
+            return "Para trocar palavras em English, volte para a revisão da cue.";
         }
         return "Revise English e Português antes de salvar.";
     }
