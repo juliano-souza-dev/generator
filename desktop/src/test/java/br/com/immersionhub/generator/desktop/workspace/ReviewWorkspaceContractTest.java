@@ -117,6 +117,9 @@ class ReviewWorkspaceContractTest {
 
         assertTrue(checkpoint.canResume(first));
 
+        ReviewWorkspaceCheckpoint dirty = checkpoint.dirty();
+        assertFalse(dirty.canResume(first));
+
         ReviewWorkspaceMaterial other = ReviewWorkspaceFactory.fromEditorial(
             editorialWithChangedPt(),
             5_000
