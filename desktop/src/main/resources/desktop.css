@@ -129,7 +129,8 @@
 .nav-button:focused,
 .source-field:focused,
 .time-field:focused,
-.waveform-pane:focused {
+.waveform-pane:focused,
+.review-text-area:focused {
     -fx-border-color: #8ab4ff;
     -fx-border-width: 2;
     -fx-border-radius: 8;
@@ -148,7 +149,6 @@
     -fx-font-size: 12px;
     -fx-font-weight: 600;
 }
-
 
 .project-card {
     -fx-background-color: #111720;
@@ -177,4 +177,37 @@
     -fx-border-radius: 8;
     -fx-background-radius: 8;
     -fx-font-family: "Segoe UI";
+}
+.review-text-area {
+    -fx-control-inner-background: #141923;
+    -fx-background-color: #141923;
+    -fx-text-fill: #f4f7fb;
+    -fx-prompt-text-fill: #6f7b8c;
+    -fx-border-color: #2c3544;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-size: 16px;
+    -fx-padding: 4;
+}
+.review-original {
+    -fx-opacity: 0.82;
+}
+.review-progress {
+    -fx-text-fill: #d9e2ef;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+}
+.review-state {
+    -fx-padding: 4 9;
+    -fx-background-radius: 999;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+.review-state.review-pending {
+    -fx-background-color: #332b1e;
+    -fx-text-fill: #e4bf83;
+}
+.review-state.review-approved {
+    -fx-background-color: #183126;
+    -fx-text-fill: #8ed9ae;
 }
