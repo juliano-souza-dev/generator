@@ -15,7 +15,8 @@ import javafx.scene.layout.VBox;
 
 public final class AppShell {
     private final BorderPane root = new BorderPane();
-    private final Label sectionLabel = new Label("SOURCE");
+    private final Label sectionLabel = new Label("HOME");
+    private final Button homeButton = navButton("Home");
     private final Button sourceButton = navButton("Source");
     private final Button waveButton = navButton("Wave");
     private final Button preparationButton = navButton("Prepare");
@@ -29,6 +30,10 @@ public final class AppShell {
     }
 
     public Parent root() { return root; }
+
+    public void setHomeAction(Runnable action) {
+        homeButton.setOnAction(event -> action.run());
+    }
 
     public void setSourceAction(Runnable action) {
         sourceButton.setOnAction(event -> action.run());
@@ -53,6 +58,7 @@ public final class AppShell {
     public void show(Node content, ScreenId screen) {
         root.setCenter(content);
         sectionLabel.setText(screen.name());
+        setActive(homeButton, screen == ScreenId.HOME);
         setActive(sourceButton, screen == ScreenId.SOURCE);
         setActive(waveButton, screen == ScreenId.WAVE);
         setActive(preparationButton, screen == ScreenId.PREPARATION);
@@ -82,11 +88,12 @@ public final class AppShell {
         Label flow = new Label("FLOW");
         flow.getStyleClass().add("sidebar-kicker");
 
+        homeButton.setMaxWidth(Double.MAX_VALUE);
         sourceButton.setMaxWidth(Double.MAX_VALUE);
         waveButton.setMaxWidth(Double.MAX_VALUE);
         preparationButton.setMaxWidth(Double.MAX_VALUE);
 
-        VBox sidebar = new VBox(8, flow, sourceButton, waveButton, preparationButton);
+        VBox sidebar = new VBox(8, flow, homeButton, sourceButton, waveButton, preparationButton);
         sidebar.setPadding(new Insets(22, 14, 22, 14));
         sidebar.setPrefWidth(200);
         sidebar.getStyleClass().add("sidebar");
