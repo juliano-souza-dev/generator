@@ -121,7 +121,7 @@ class ProjectRepositoryTest {
 
         Path json = repository.projectDirectory(current.projectId()).resolve("project.json");
         String legacy = Files.readString(json)
-            .replace("\"schemaVersion\" : 2", "\"schemaVersion\" : 1")
+            .replace("\"schemaVersion\" : " + ProjectState.CURRENT_SCHEMA_VERSION, "\"schemaVersion\" : 1")
             .replace("\"currentStage\" : \"TRANSLATION\"", "\"currentStage\" : \"PREPARATION\"");
         Files.writeString(json, legacy);
 
